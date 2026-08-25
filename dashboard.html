@@ -1330,7 +1330,7 @@
       </div>
       <div class="sheet-error" id="amountError" style="display:none;"></div>
 
-      <div class="field-label" data-i18n="choose_method">Choose a payment method</div>
+      <div class="field-label" data-i18n="choose_method" id="methodLabel">Choose a payment method</div>
       <div class="method-list" id="methodList">
         <button class="method-card" data-method="mtn" onclick="selectMethod('mtn')">
           <span class="method-badge" style="background:#FFCB05; color:#111;">MTN</span>
@@ -1344,10 +1344,12 @@
         </button>
       </div>
 
-      <div class="field-label" data-i18n="phone_number">Phone number</div>
-      <div class="simple-field">
+      <div class="field-label" data-i18n="phone_number" id="phoneLabel">Phone number</div>
+      <div class="simple-field" id="phoneField">
         <input type="text" inputmode="tel" id="sheetPhone" placeholder="+237 6XX XXX XXX">
       </div>
+
+      <div class="field-label" id="fapshiRedirectNote" style="display:none; font-weight:400; color:var(--gray-500);" data-i18n="fapshi_redirect_note">You'll be taken to Fapshi's secure checkout to complete this payment.</div>
 
       <button class="sheet-submit" id="sheetSubmit" onclick="submitTransaction()" disabled data-i18n="confirm">Confirm</button>
     </div>
@@ -1477,8 +1479,8 @@
 <script>
   // ---------- Supabase client ----------
   // TODO: replace with your project's URL + public anon key (Supabase dashboard > Settings > API)
-  const SUPABASE_URL = 'https://afxqjdbqmpqpverpjikj.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmeHFqZGJxbXBxcHZlcnBqaWtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0Mjg1OTcsImV4cCI6MjEwMzAwNDU5N30.ynd0Uvem85-DdFKu3-RkNQsWFnPC_8IQxDyBrl6v6vI';
+  const SUPABASE_URL = 'https://rhyrniaftzdirwodbsjg.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJoeXJuaWFmdHpkaXJ3b2Ric2pnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTQ4NDksImV4cCI6MjEwMzE3MDg0OX0.5uiyuQkp3mbl7E4_4hTuI2Dx1eMLQ2UHepF8RF8Awx8';
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const SUPABASE_FUNCTIONS_URL = SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co');
 
@@ -2077,7 +2079,7 @@
   function validateSheet(){
     const dict = translations[currentLang];
     const errEl = document.getElementById('amountError');
-    let valid = selectedAmount > 0 && selectedMethod;
+    let valid = selectedAmount > 0 && (sheetMode === 'topup' || selectedMethod);
     if (sheetMode === 'withdraw' && selectedAmount > walletBalance){
       errEl.textContent = dict.insufficient_balance;
       errEl.style.display = 'block';
@@ -2106,6 +2108,13 @@
     document.getElementById('sheetPin').classList.remove('active');
     document.getElementById('sheetProcessing').classList.remove('active');
     document.getElementById('sheetSuccess').classList.remove('active');
+
+    const isTopup = mode === 'topup';
+    document.getElementById('methodLabel').style.display = isTopup ? 'none' : '';
+    document.getElementById('methodList').style.display = isTopup ? 'none' : '';
+    document.getElementById('phoneLabel').style.display = isTopup ? 'none' : '';
+    document.getElementById('phoneField').style.display = isTopup ? 'none' : '';
+    document.getElementById('fapshiRedirectNote').style.display = isTopup ? '' : 'none';
 
     document.getElementById('sheetOverlay').classList.add('open');
   }
@@ -2204,33 +2213,38 @@
     renderStats();
   }
 
-  // ---- Fapshi deposit flow ----
-  // 1. Ask our Edge Function to start a Fapshi Direct Pay charge (keeps the
-  //    Fapshi API secret off the client).
-  // 2. Poll fapshi_transactions for this trans_id — Fapshi's webhook flips
-  //    its status once the user confirms (or declines) on their phone.
-  // 3. Only reflect success once the DB says SUCCESSFUL — never assume it
-  //    locally.
+  // ---- Fapshi deposit flow (hosted checkout via Initiate Pay) ----
+  // 1. Ask our Edge Function to start a Fapshi Initiate Pay charge (keeps
+  //    the Fapshi API secret off the client) — it returns a hosted
+  //    checkout link.
+  // 2. Redirect the browser there. The user pays on Fapshi's page, which
+  //    redirects back to this same page once done.
+  // 3. On return (and while still on Fapshi's page, via background
+  //    polling elsewhere isn't possible — polling resumes once we're
+  //    back), poll fapshi_transactions for this trans_id until Fapshi's
+  //    webhook flips its status. Only ever reflect success once the DB
+  //    says SUCCESSFUL — never assume it locally.
   const FAPSHI_POLL_INTERVAL_MS = 3000;
-  const FAPSHI_POLL_TIMEOUT_MS = 120000; // 2 minutes — Direct Pay prompts expire on the operator side too
+  const FAPSHI_POLL_TIMEOUT_MS = 120000; // 2 minutes
+  const FAPSHI_PENDING_KEY = 'verafund_pending_fapshi';
 
   async function proceedWithFapshiTopup(){
     const dict = translations[currentLang];
-    const phone = (document.getElementById('sheetPhone').value || '').replace(/\D/g, '');
-    const medium = selectedMethod === 'orange' ? 'orange' : 'mtn';
 
-    let transId;
+    let transId, link;
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
+      const redirectUrl = window.location.origin + window.location.pathname;
       const resp = await fetch(SUPABASE_FUNCTIONS_URL + '/fapshi-initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ amount: selectedAmount, phone, medium })
+        body: JSON.stringify({ amount: selectedAmount, redirectUrl })
       });
       const body = await resp.json();
-      if (!resp.ok || !body.transId) throw new Error(body.error || 'fapshi_initiate_failed');
+      if (!resp.ok || !body.transId || !body.link) throw new Error(body.error || 'fapshi_initiate_failed');
       transId = body.transId;
+      link = body.link;
     } catch(e){
       console.error('Fapshi initiate failed', e);
       document.getElementById('sheetProcessing').classList.remove('active');
@@ -2240,15 +2254,24 @@
       return;
     }
 
-    // Poll until Fapshi's webhook (received server-side) updates this row.
-    const startedAt = Date.now();
+    // Persist before navigating away so we can resume polling once the
+    // user is redirected back from Fapshi's hosted page.
+    try {
+      localStorage.setItem(FAPSHI_PENDING_KEY, JSON.stringify({ transId, startedAt: Date.now() }));
+    } catch(e){ /* localStorage unavailable — resume-on-return just won't work, initial redirect still will */ }
+
+    window.location.href = link;
+  }
+
+  async function pollFapshiTransaction(transId, startedAt){
+    const dict = translations[currentLang];
+
     while (Date.now() - startedAt < FAPSHI_POLL_TIMEOUT_MS){
-      await new Promise(r => setTimeout(r, FAPSHI_POLL_INTERVAL_MS));
       const { data: row, error: pollErr } = await supabase
         .from('fapshi_transactions').select('status').eq('trans_id', transId).single();
-      if (pollErr){ console.error('poll failed', pollErr); continue; }
-
-      if (row.status === 'SUCCESSFUL'){
+      if (pollErr){ console.error('poll failed', pollErr); }
+      else if (row.status === 'SUCCESSFUL'){
+        try{ localStorage.removeItem(FAPSHI_PENDING_KEY); }catch(e){}
         await loadWallet();   // pulls the authoritative new balance + total_deposited
         await loadActivity(); // pulls the real transaction row Fapshi's webhook created
         renderAccountStatus();
@@ -2258,8 +2281,8 @@
         document.getElementById('successTitle').textContent = dict.success_topup;
         document.getElementById('successSub').textContent = dict.new_balance + ' XAF ' + walletBalance.toLocaleString('en-US');
         return;
-      }
-      if (row.status === 'FAILED' || row.status === 'EXPIRED'){
+      } else if (row.status === 'FAILED' || row.status === 'EXPIRED'){
+        try{ localStorage.removeItem(FAPSHI_PENDING_KEY); }catch(e){}
         document.getElementById('sheetProcessing').classList.remove('active');
         document.getElementById('sheetForm').classList.add('active');
         document.getElementById('amountError').textContent = dict.fetch_error_msg;
@@ -2267,13 +2290,34 @@
         return;
       }
       // still PENDING — keep polling
+      await new Promise(r => setTimeout(r, FAPSHI_POLL_INTERVAL_MS));
     }
 
-    // Timed out waiting — leave it as pending; the webhook may still land later.
+    // Timed out waiting — leave it as pending in storage; the webhook may
+    // still land later, and the next page load will resume checking.
     document.getElementById('sheetProcessing').classList.remove('active');
     document.getElementById('sheetForm').classList.add('active');
     document.getElementById('amountError').textContent = dict.fetch_error_msg;
     document.getElementById('amountError').style.display = 'block';
+  }
+
+  // Called on page load — if the user was mid-deposit and got redirected
+  // back from Fapshi's hosted checkout, resume watching for the result
+  // instead of leaving them with no feedback at all.
+  function resumePendingFapshiTopupIfAny(){
+    let pending;
+    try{ pending = JSON.parse(localStorage.getItem(FAPSHI_PENDING_KEY) || 'null'); }catch(e){ pending = null; }
+    if (!pending || !pending.transId) return;
+
+    if (Date.now() - pending.startedAt >= FAPSHI_POLL_TIMEOUT_MS){
+      try{ localStorage.removeItem(FAPSHI_PENDING_KEY); }catch(e){}
+      return; // too old — don't resurrect a stale wait
+    }
+
+    openSheet('topup');
+    document.getElementById('sheetForm').classList.remove('active');
+    document.getElementById('sheetProcessing').classList.add('active');
+    pollFapshiTransaction(pending.transId, pending.startedAt);
   }
 
   function renderAccountStatus(){
@@ -2379,6 +2423,7 @@
     en: {
       greeting_hello:'Welcome back', greeting_hello_short:'Hello', pf_label:'Combined portfolio value', pf_period:'this month',
       fetch_error_msg:"Couldn't load this — check your connection.", fetch_retry:'Retry',
+      fapshi_redirect_note:"You'll be taken to Fapshi's secure checkout to complete this payment.",
       spin_label:'Daily spin', spin_sub:'Spin once every 24 hours for a free reward.', spin_btn:'Spin now', spin_next_in:'Next spin in', spin_won:'🎉 You won {amount}!',
       bd_bonds:'Bonds',
       qa_bonds:'Buy bonds',
@@ -2460,6 +2505,7 @@
     fr: {
       greeting_hello:'Content de vous revoir', greeting_hello_short:'Bonjour', pf_label:'Valeur totale du portefeuille', pf_period:'ce mois-ci',
       fetch_error_msg:"Impossible de charger — vérifiez votre connexion.", fetch_retry:'Réessayer',
+      fapshi_redirect_note:"Vous serez redirigé vers le paiement sécurisé de Fapshi pour terminer cette transaction.",
       spin_label:'Tour gratuit', spin_sub:'Tournez une fois toutes les 24 heures pour une récompense gratuite.', spin_btn:'Tourner', spin_next_in:'Prochain tour dans', spin_won:'🎉 Vous avez gagné {amount} !',
       bd_bonds:'Obligations',
       qa_bonds:"Acheter des obligations",
@@ -2762,6 +2808,7 @@
     applyLang(saved); // paints skeleton/loading state immediately
     setInterval(updateSpinAvailability, 1000);
     loadAllData(); // fetches from Supabase, each loader re-renders its own section as it resolves
+    resumePendingFapshiTopupIfAny();
   })();
 
   function copyReferralLink(){
