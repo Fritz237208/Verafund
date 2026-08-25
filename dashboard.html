@@ -1481,7 +1481,7 @@
   // TODO: replace with your project's URL + public anon key (Supabase dashboard > Settings > API)
   const SUPABASE_URL = 'https://rhyrniaftzdirwodbsjg.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJoeXJuaWFmdHpkaXJ3b2Ric2pnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTQ4NDksImV4cCI6MjEwMzE3MDg0OX0.5uiyuQkp3mbl7E4_4hTuI2Dx1eMLQ2UHepF8RF8Awx8';
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const SUPABASE_FUNCTIONS_URL = SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co');
 
   // Expected tables (rename to match your actual schema, or edit the .from() calls below):
@@ -1496,7 +1496,7 @@
   //   spin_wheel_segments  (id, position int, amount bigint)   -- admin sets amount per row
 
   async function getCurrentUserId(){
-    const { data, error } = await supabase.auth.getUser();
+    const { data, error } = await sb.auth.getUser();
     if (error) console.error('getCurrentUserId failed', error);
     return data?.user?.id || null;
   }
@@ -1604,8 +1604,8 @@
     try{
       const userId = await getCurrentUserId();
       const [{ data: listingData, error: listingErr }, { data: myBondsData, error: myBondsErr }] = await Promise.all([
-        supabase.from('bond_listings').select('name,yield_pct,maturity_year,min_buyin,daily_est,total_at_maturity,image_url'),
-        supabase.from('user_bonds').select('bond_name,amount,change_pct').eq('user_id', userId)
+        sb.from('bond_listings').select('name,yield_pct,maturity_year,min_buyin,daily_est,total_at_maturity,image_url'),
+        sb.from('user_bonds').select('bond_name,amount,change_pct').eq('user_id', userId)
       ]);
       if (listingErr) throw listingErr;
       if (myBondsErr) throw myBondsErr;
@@ -1841,7 +1841,7 @@
       return;
     }
     try{
-      const { error } = await supabase.auth.updateUser({ password: pw });
+      const { error } = await sb.auth.updateUser({ password: pw });
       if (error) throw error;
     } catch(e){
       errEl.textContent = dict.fetch_error_msg;
@@ -1859,7 +1859,7 @@
 
   async function loadProfile(){
     try{
-      const { data: pinData, error: pinErr } = await supabase.rpc('has_transaction_pin');
+      const { data: pinData, error: pinErr } = await sb.rpc('has_transaction_pin');
       if (pinErr) throw pinErr;
       pinIsSet = !!pinData;
     } catch(e){
@@ -1867,7 +1867,7 @@
     }
 
     try{
-      const { data, error } = await supabase.auth.getUser();
+      const { data, error } = await sb.auth.getUser();
       if (error) throw error;
       const user = data?.user;
       if (!user) return;
@@ -1915,9 +1915,9 @@
     try{
       const userId = await getCurrentUserId();
       const [{ data: profileRow, error: profileErr }, { data: friendsCount, error: friendsErr }, { data: earnings, error: earningsErr }] = await Promise.all([
-        supabase.from('profiles').select('referral_code').eq('user_id', userId).single(),
-        supabase.rpc('my_referral_count'),
-        supabase.rpc('my_referral_earnings')
+        sb.from('profiles').select('referral_code').eq('user_id', userId).single(),
+        sb.rpc('my_referral_count'),
+        sb.rpc('my_referral_earnings')
       ]);
       if (profileErr) throw profileErr;
       if (friendsErr) throw friendsErr;
@@ -1949,7 +1949,7 @@
       return;
     }
     try{
-      const { error } = await supabase.rpc('set_transaction_pin', { p_pin: pin });
+      const { error } = await sb.rpc('set_transaction_pin', { p_pin: pin });
       if (error) throw error;
     } catch(e){
       errEl.textContent = dict.fetch_error_msg;
@@ -2145,7 +2145,7 @@
     }
     let ok;
     try{
-      const { data, error } = await supabase.rpc('verify_transaction_pin', { p_pin: entered });
+      const { data, error } = await sb.rpc('verify_transaction_pin', { p_pin: entered });
       if (error) throw error;
       ok = data;
     } catch(e){
@@ -2177,7 +2177,7 @@
 
     let result, error;
     try {
-      const resp = await supabase.rpc('withdraw_wallet', { p_amount: selectedAmount, p_method: methodLabel });
+      const resp = await sb.rpc('withdraw_wallet', { p_amount: selectedAmount, p_method: methodLabel });
       result = resp.data; error = resp.error;
     } catch(e){ error = e; }
 
@@ -2233,7 +2233,7 @@
 
     let transId, link;
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData } = await sb.auth.getSession();
       const token = sessionData?.session?.access_token;
       const redirectUrl = window.location.origin + window.location.pathname;
       const resp = await fetch(SUPABASE_FUNCTIONS_URL + '/fapshi-initiate', {
@@ -2746,7 +2746,7 @@
     // animation starts, so we know which segment to actually land on.
     let claim;
     try{
-      const { data, error } = await supabase.rpc('claim_spin_reward');
+      const { data, error } = await sb.rpc('claim_spin_reward');
       if (error) throw error;
       claim = data;
     } catch(e){
