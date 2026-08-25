@@ -232,11 +232,8 @@
         <!-- LOGIN -->
         <div class="mode-block show" id="loginBlock">
           <div class="field">
-            <label for="loginPhone" data-i18n="label_phone">Phone number</label>
-            <div class="phone-row">
-              <span class="phone-prefix">🇨🇲 +237</span>
-              <input type="tel" id="loginPhone" data-i18n-placeholder="ph_phone" placeholder="Enter phone number">
-            </div>
+            <label for="loginEmail" data-i18n="label_email">Email</label>
+            <input type="email" id="loginEmail" data-i18n-placeholder="ph_email" placeholder="Email address">
           </div>
           <div class="field">
             <div class="field-row">
@@ -254,11 +251,12 @@
         <!-- SIGNUP -->
         <div class="mode-block" id="signupBlock">
           <div class="field">
-            <label for="signupPhone" data-i18n="label_phone">Phone number</label>
-            <div class="phone-row">
-              <span class="phone-prefix">🇨🇲 +237</span>
-              <input type="tel" id="signupPhone" data-i18n-placeholder="ph_phone" placeholder="Enter phone number">
-            </div>
+            <label for="signupName" data-i18n="label_name">Full name</label>
+            <input type="text" id="signupName" data-i18n-placeholder="ph_name" placeholder="Enter your full name">
+          </div>
+          <div class="field">
+            <label for="signupEmail" data-i18n="label_email">Email</label>
+            <input type="email" id="signupEmail" data-i18n-placeholder="ph_email" placeholder="Email address">
           </div>
           <div class="field">
             <label for="signupPassword" data-i18n="label_password">Password</label>
@@ -323,8 +321,8 @@
       label_confirm: "Confirm password",
       label_referral: "Referral code (optional)",
       ph_referral: "Enter referral code",
-      label_phone: "Phone number",
-      ph_phone: "Enter phone number",
+      label_name: "Full name",
+      ph_name: "Enter your full name",
       pw_helper: "Use 8 or more characters with a mix of letters, numbers & symbols",
       terms_plain: "By creating an account, you agree to our",
       terms_link1: "Terms of use",
@@ -338,8 +336,9 @@
       subtitle_login: "Log in to continue to VeraFund.",
       title_signup: "You're almost in!",
       subtitle_signup: "Enter your details to create your account.",
-      err_phone_required: "Please enter your phone number.",
-      err_phone_invalid: "Enter a valid Cameroon phone number.",
+      err_name_required: "Please enter your full name.",
+      err_email_required: "Please enter your email address.",
+      err_email_invalid: "Enter a valid email address.",
       err_password_required: "Please enter your password.",
       err_password_short: "Password must be at least 8 characters.",
       err_password_mismatch: "Passwords do not match.",
@@ -364,8 +363,8 @@
       label_confirm: "Confirmer le mot de passe",
       label_referral: "Code de parrainage (facultatif)",
       ph_referral: "Entrez le code de parrainage",
-      label_phone: "Numéro de téléphone",
-      ph_phone: "Entrez le numéro de téléphone",
+      label_name: "Nom complet",
+      ph_name: "Entrez votre nom complet",
       pw_helper: "Utilisez 8 caractères ou plus avec un mélange de lettres, chiffres et symboles",
       terms_plain: "En créant un compte, vous acceptez nos",
       terms_link1: "Conditions d'utilisation",
@@ -379,8 +378,9 @@
       subtitle_login: "Connectez-vous pour continuer vers VeraFund.",
       title_signup: "Vous y êtes presque !",
       subtitle_signup: "Entrez vos informations pour créer votre compte.",
-      err_phone_required: "Veuillez entrer votre numéro de téléphone.",
-      err_phone_invalid: "Entrez un numéro de téléphone camerounais valide.",
+      err_name_required: "Veuillez entrer votre nom complet.",
+      err_email_required: "Veuillez entrer votre adresse e-mail.",
+      err_email_invalid: "Entrez une adresse e-mail valide.",
       err_password_required: "Veuillez entrer votre mot de passe.",
       err_password_short: "Le mot de passe doit contenir au moins 8 caractères.",
       err_password_mismatch: "Les mots de passe ne correspondent pas.",
@@ -481,7 +481,7 @@
   }
 
   const REDIRECT_URL = 'dashboard.html';
-  const CM_PHONE_RE = /^6\d{8}$/; // Cameroon mobile: starts with 6, 9 digits total
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   // ---- Turnstile captcha ----
   let turnstileToken = '';
@@ -514,23 +514,15 @@
     btn.textContent = loading ? '…' : t(idleKey);
   }
 
-  function toE164(rawDigits){
-    return '+237' + rawDigits;
-  }
-
-  function cleanDigits(value){
-    return (value || '').replace(/\D/g, '');
-  }
-
   // ---- Login ----
   document.getElementById('loginSubmit').addEventListener('click', async function(){
     hideStatus();
     if (!supabaseClient) return showStatus('err_generic', 'error');
-    const phoneDigits = cleanDigits(document.getElementById('loginPhone').value);
+    const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
 
-    if (!phoneDigits) return showStatus('err_phone_required', 'error');
-    if (!CM_PHONE_RE.test(phoneDigits)) return showStatus('err_phone_invalid', 'error');
+    if (!email) return showStatus('err_email_required', 'error');
+    if (!EMAIL_RE.test(email)) return showStatus('err_email_invalid', 'error');
     if (!password) return showStatus('err_password_required', 'error');
     if (!turnstileToken) return showStatus('err_captcha', 'error');
 
@@ -538,7 +530,7 @@
     setLoading(btn, true);
 
     const { data, error } = await supabaseClient.auth.signInWithPassword({
-      phone: toE164(phoneDigits),
+      email: email,
       password: password,
       options: { captchaToken: turnstileToken }
     });
@@ -560,14 +552,16 @@
   document.getElementById('signupSubmit').addEventListener('click', async function(){
     hideStatus();
     if (!supabaseClient) return showStatus('err_generic', 'error');
-    const phoneDigits = cleanDigits(document.getElementById('signupPhone').value);
+    const name = document.getElementById('signupName').value.trim();
+    const email = document.getElementById('signupEmail').value.trim();
     const password = document.getElementById('signupPassword').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
     const referral = document.getElementById('referral').value.trim();
     const agreed = document.querySelector('#signupBlock input[type="checkbox"]').checked;
 
-    if (!phoneDigits) return showStatus('err_phone_required', 'error');
-    if (!CM_PHONE_RE.test(phoneDigits)) return showStatus('err_phone_invalid', 'error');
+    if (!name) return showStatus('err_name_required', 'error');
+    if (!email) return showStatus('err_email_required', 'error');
+    if (!EMAIL_RE.test(email)) return showStatus('err_email_invalid', 'error');
     if (!password) return showStatus('err_password_required', 'error');
     if (password.length < 8) return showStatus('err_password_short', 'error');
     if (password !== confirmPassword) return showStatus('err_password_mismatch', 'error');
@@ -577,11 +571,14 @@
     const btn = document.getElementById('signupSubmit');
     setLoading(btn, true);
 
+    const userData = { full_name: name };
+    if (referral) userData.referral_code_used = referral;
+
     const { data, error } = await supabaseClient.auth.signUp({
-      phone: toE164(phoneDigits),
+      email: email,
       password: password,
       options: {
-        data: referral ? { referral_code_used: referral } : {},
+        data: userData,
         captchaToken: turnstileToken
       }
     });
