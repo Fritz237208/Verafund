@@ -290,8 +290,7 @@
           <button type="submit" class="btn-primary" id="signupSubmit" data-i18n="btn_signup">Create an account</button>
         </div>
 
-        <div id="turnstileWidget" class="cf-turnstile" data-sitekey="0x4AAAAAAEZVQAywxgQzkQj1" data-callback="onTurnstileVerify" data-expired-callback="onTurnstileExpire"></div>
-
+        
       </form>
 
       <p class="switch-line" id="switchLine">
@@ -302,7 +301,6 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script>
   // ---------- i18n ----------
   const translations = {
@@ -343,7 +341,6 @@
       err_password_short: "Password must be at least 8 characters.",
       err_password_mismatch: "Passwords do not match.",
       err_terms: "Please accept the Terms of use and Privacy Policy.",
-      err_captcha: "Please complete the verification check.",
       err_generic: "Something went wrong. Please try again.",
       msg_signup_success: "Account created! Redirecting…",
       msg_login_success: "Welcome back! Redirecting…"
@@ -385,7 +382,6 @@
       err_password_short: "Le mot de passe doit contenir au moins 8 caractères.",
       err_password_mismatch: "Les mots de passe ne correspondent pas.",
       err_terms: "Veuillez accepter les Conditions d'utilisation et la Politique de confidentialité.",
-      err_captcha: "Veuillez compléter la vérification.",
       err_generic: "Une erreur s'est produite. Veuillez réessayer.",
       msg_signup_success: "Compte créé ! Redirection…",
       msg_login_success: "Content de vous revoir ! Redirection…"
@@ -483,16 +479,6 @@
   const REDIRECT_URL = 'dashboard.html';
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  // ---- Turnstile captcha ----
-  let turnstileToken = '';
-  window.onTurnstileVerify = function(token){ turnstileToken = token; };
-  window.onTurnstileExpire = function(){ turnstileToken = ''; };
-
-  function resetTurnstile(){
-    turnstileToken = '';
-    if (window.turnstile) window.turnstile.reset('#turnstileWidget');
-  }
-
   function t(key){
     const dict = translations[currentLang] || translations.en;
     return dict[key] || key;
@@ -524,19 +510,16 @@
     if (!email) return showStatus('err_email_required', 'error');
     if (!EMAIL_RE.test(email)) return showStatus('err_email_invalid', 'error');
     if (!password) return showStatus('err_password_required', 'error');
-    if (!turnstileToken) return showStatus('err_captcha', 'error');
 
     const btn = document.getElementById('loginSubmit');
     setLoading(btn, true);
 
     const { data, error } = await supabaseClient.auth.signInWithPassword({
       email: email,
-      password: password,
-      options: { captchaToken: turnstileToken }
+      password: password
     });
 
     setLoading(btn, false, 'btn_login');
-    resetTurnstile();
 
     if (error){
       showStatus('err_generic', 'error');
@@ -566,7 +549,6 @@
     if (password.length < 8) return showStatus('err_password_short', 'error');
     if (password !== confirmPassword) return showStatus('err_password_mismatch', 'error');
     if (!agreed) return showStatus('err_terms', 'error');
-    if (!turnstileToken) return showStatus('err_captcha', 'error');
 
     const btn = document.getElementById('signupSubmit');
     setLoading(btn, true);
@@ -578,13 +560,11 @@
       email: email,
       password: password,
       options: {
-        data: userData,
-        captchaToken: turnstileToken
+        data: userData
       }
     });
 
     setLoading(btn, false, 'btn_signup');
-    resetTurnstile();
 
     if (error){
       showStatus('err_generic', 'error');
