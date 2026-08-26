@@ -1622,13 +1622,13 @@
     try{
       const userId = await getCurrentUserId();
       const [{ data: listingData, error: listingErr }, { data: myBondsData, error: myBondsErr }] = await Promise.all([
-        sb.from('bond_listings').select('name,yield_pct,maturity_year,min_buyin,daily_est,total_at_maturity,image_url'),
+        sb.from('bond_listings').select('id,name,yield_pct,maturity_year,min_buyin,daily_est,total_at_maturity,image_url'),
         sb.from('user_bonds').select('bond_name,amount,change_pct').eq('user_id', userId)
       ]);
       if (listingErr) throw listingErr;
       if (myBondsErr) throw myBondsErr;
       bondsListing = (listingData || []).map(row => ({
-        name: row.name, yield: row.yield_pct + '%', maturity: row.maturity_year,
+        id: row.id, name: row.name, yield: row.yield_pct + '%', maturity: row.maturity_year,
         min: row.min_buyin, daily: row.daily_est, total: row.total_at_maturity, image: row.image_url
       }));
       myBonds = (myBondsData || []).map(row => ({name:row.bond_name, amount:row.amount, change:row.change_pct}));
@@ -1828,11 +1828,58 @@
           {iconSvg: rowIcons.bars, iconBg:'#E9F7EF', iconColor:'var(--green)', title: fmtXAF(b.total), sub: dict.meta_total_maturity}
         ],
         priceLabel: dict.meta_min_buyin, priceVal: fmtXAF(b.min),
-        btnColor:'var(--amber)', btnText: dict.btn_invest
+        btnColor:'var(--amber)', btnText: dict.btn_invest,
+        btnOnclick: `investInBond('${b.id}', ${b.min}, '${b.name.replace(/'/g, "\\'")}')`
       });
     }).join('');
   }
 
+
+  async function investInBond(bondId, minBuyin, bondName){
+    const dict = translations[currentLang];
+    const promptMsg = (dict.invest_amount_prompt || 'Amount to invest (min {min}):')
+      .replace('{min}', fmtXAF(minBuyin));
+    const input = prompt(promptMsg, minBuyin);
+    if (input === null) return; // cancelled
+
+    const amount = parseInt(String(input).replace(/[^\d]/g, ''), 10);
+    if (!amount || amount < minBuyin){
+      alert(dict.invest_below_min || `Amount must be at least ${fmtXAF(minBuyin)}.`);
+      return;
+    }
+    if (!confirm(`${dict.invest_confirm_prefix || 'Invest'} ${fmtXAF(amount)} ${dict.invest_confirm_in || 'in'} ${bondName}?`)) return;
+
+    try{
+      const { data, error } = await sb.rpc('invest_in_bond', { p_bond_id: bondId, p_amount: amount });
+      if (error) throw error;
+
+      walletBalance = data.balance;
+      renderWallet();
+
+      activity.unshift({
+        icon:'bonds',
+        title:{en:'Bond purchase — ' + bondName, fr:"Achat d'obligation — " + bondName},
+        amount:-amount,
+        date:{en:'Just now', fr:"À l'instant"},
+        status:'completed'
+      });
+      renderActivity();
+
+      await loadBonds(); // refreshes myBonds with the new holding
+
+      if (data.first_investment){
+        alert(dict.invest_success_first || 'Investment successful! Referral bonuses (if any) have been paid out to your referrers.');
+      } else {
+        alert(dict.invest_success || 'Investment successful!');
+      }
+    } catch(e){
+      console.error('invest_in_bond failed', e);
+      const msg = e.message === 'insufficient_balance' ? dict.insufficient_balance
+                : e.message === 'below_minimum' ? (dict.invest_below_min || 'Amount is below the minimum buy-in.')
+                : dict.fetch_error_msg;
+      alert(msg);
+    }
+  }
 
   function setProfileSeg(seg){
     document.getElementById('profileSegOverview').classList.toggle('active', seg === 'overview');
@@ -2463,6 +2510,9 @@
       status_completed:'Completed', status_pending:'Pending', status_failed:'Failed',
       none_yet:'Nothing here yet.',
       yield_label:'yield', meta_min_buyin:'Min. buy-in', btn_invest:'Invest',
+      invest_amount_prompt:'Amount to invest (min {min}):', invest_below_min:'Amount is below the minimum buy-in.',
+      invest_confirm_prefix:'Invest', invest_confirm_in:'in',
+      invest_success:'Investment successful!', invest_success_first:'Investment successful! Referral bonuses (if any) have been paid out to your referrers.',
       wallet_balance:'Available balance', add_money:'Add money', withdraw:'Withdraw',
       choose_amount:'Choose an amount', choose_method:'Choose a payment method',
       phone_number:'Phone number', confirm:'Confirm',
@@ -2545,6 +2595,9 @@
       status_completed:'Terminé', status_pending:'En attente', status_failed:'Échoué',
       none_yet:'Rien ici pour le moment.',
       yield_label:'rendement', meta_min_buyin:'Mise min.', btn_invest:'Investir',
+      invest_amount_prompt:'Montant à investir (min {min}) :', invest_below_min:'Le montant est inférieur à la mise minimale.',
+      invest_confirm_prefix:'Investir', invest_confirm_in:'dans',
+      invest_success:'Investissement réussi !', invest_success_first:'Investissement réussi ! Les bonus de parrainage (le cas échéant) ont été versés à vos parrains.',
       wallet_balance:'Solde disponible', add_money:'Ajouter de l\u2019argent', withdraw:'Retirer',
       choose_amount:'Choisissez un montant', choose_method:'Choisissez un moyen de paiement',
       phone_number:'Numéro de téléphone', confirm:'Confirmer',
