@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VeraFund — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#0B1120;
+    --ink-soft:#5A6479;
+    --blue:#155EEF;
+    --blue-dark:#0E46B8;
+    --navy:#0A2472;
+    --green:#16A34A;
+    --amber:#D97706;
+    --purple:#7C3AED;
+    --teal:#0D9488;
+    --rose:#DB2777;
+    --red:#DC2626;
+    --bg:#F6F8FC;
+    --card-bg:#FFFFFF;
+    --field-bg:#F2F5FA;
+    --border:#E5E9F2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{font-family:'Sora',sans-serif; letter-spacing:-0.02em; margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit; text-decoration:none;}
+  button{font-family:inherit; cursor:pointer;}
+  :focus-visible{outline:2px solid var(--blue); outline-offset:2px;}
+
+  /* ---------- Shell ---------- */
+  .shell{display:flex; min-height:100vh;}
+
+  .sidebar{
+    width:236px; flex-shrink:0; background:var(--navy); color:#fff;
+    display:flex; flex-direction:column; padding:22px 14px;
+    position:sticky; top:0; height:100vh; overflow-y:auto;
+  }
+  .brand{display:flex; align-items:center; gap:10px; padding:4px 10px 26px;}
+  .brand-mark{
+    width:30px; height:30px; border-radius:8px; background:var(--blue);
+    display:flex; align-items:center; justify-content:center; font-family:'Sora',sans-serif;
+    font-weight:800; font-size:14px; flex-shrink:0;
+  }
+  .brand-text{font-family:'Sora',sans-serif; font-weight:700; font-size:15px; letter-spacing:-0.01em;}
+  .brand-text span{display:block; font-family:'Inter',sans-serif; font-weight:500; font-size:10.5px; color:#8FA0D6; letter-spacing:0.02em; margin-top:1px;}
+
+  .nav-group{margin-top:6px;}
+  .nav-label{font-size:10.5px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:#5F71AC; padding:14px 12px 6px;}
+  .nav-item{
+    display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:9px;
+    font-size:13.5px; font-weight:600; color:#C3CEEE; margin-bottom:2px; border:none; background:none; width:100%; text-align:left;
+  }
+  .nav-item svg{width:17px; height:17px; flex-shrink:0; opacity:0.85;}
+  .nav-item.active{background:rgba(255,255,255,0.1); color:#fff;}
+  .nav-item.active svg{opacity:1;}
+  .nav-item:not(.active):hover{background:rgba(255,255,255,0.05); color:#fff;}
+
+  .sidebar-footer{margin-top:auto; padding:12px; border-top:1px solid rgba(255,255,255,0.09);}
+  .admin-chip{display:flex; align-items:center; gap:9px; padding:8px 4px;}
+  .admin-avatar{width:32px; height:32px; border-radius:50%; background:#F1E9FF; color:var(--purple); display:flex; align-items:center; justify-content:center; font-family:'Sora',sans-serif; font-weight:700; font-size:13px; flex-shrink:0;}
+  .admin-meta{min-width:0;}
+  .admin-meta .name{font-size:12.5px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .admin-meta .role{font-size:11px; color:#8FA0D6;}
+
+  .main{flex:1; min-width:0; padding:26px 34px 60px;}
+
+  .topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:26px; gap:16px;}
+  .topbar h1{font-size:21px; font-weight:800;}
+  .topbar-sub{font-size:12.5px; color:var(--ink-soft); margin-top:3px;}
+  .topbar-actions{display:flex; align-items:center; gap:10px;}
+
+  /* ---------- Stat cards ---------- */
+  .stat-row{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px;}
+  .stat-card{background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:16px 18px;}
+  .stat-card .label{font-size:11.5px; color:var(--ink-soft); font-weight:600; margin-bottom:7px;}
+  .stat-card .value{font-family:'Sora',sans-serif; font-size:22px; font-weight:800; letter-spacing:-0.01em;}
+  .stat-card .value.mono-val{font-family:'IBM Plex Mono',monospace; font-size:19px;}
+
+  /* ---------- Table card ---------- */
+  .panel{background:var(--card-bg); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:22px;}
+  .panel-head{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border); gap:14px; flex-wrap:wrap;}
+  .panel-head h3{font-size:14.5px; font-weight:700;}
+  .panel-head-sub{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .search-field{
+    display:flex; align-items:center; gap:8px; background:var(--field-bg); border-radius:9px;
+    padding:8px 12px; width:260px; flex-shrink:0;
+  }
+  .search-field svg{width:15px; height:15px; color:var(--ink-soft); flex-shrink:0;}
+  .search-field input{border:none; background:none; outline:none; font-size:13px; width:100%; color:var(--ink); font-family:'Inter',sans-serif;}
+  .search-field input::placeholder{color:#9AA5BC;}
+
+  .head-controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .filter-chips{display:flex; gap:6px; flex-wrap:wrap;}
+  .filter-chip{padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:#fff; font-size:12px; font-weight:600; color:var(--ink-soft);}
+  .filter-chip.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+
+  table{width:100%; border-collapse:collapse;}
+  thead th{
+    text-align:left; font-size:11px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase;
+    color:var(--ink-soft); padding:11px 20px; border-bottom:1px solid var(--border); background:#FAFBFD;
+  }
+  tbody td{padding:13px 20px; font-size:13px; border-bottom:1px solid var(--border); vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr{transition:background 0.1s;}
+  tbody tr.is-clickable:hover{background:#FAFBFD; cursor:pointer;}
+
+  .user-cell{display:flex; align-items:center; gap:10px;}
+  .user-avatar{width:34px; height:34px; border-radius:50%; background:#EAF1FF; color:var(--blue); display:flex; align-items:center; justify-content:center; font-family:'Sora',sans-serif; font-weight:700; font-size:12.5px; flex-shrink:0;}
+  .bond-thumb{width:42px; height:42px; border-radius:9px; object-fit:cover; background:var(--field-bg); border:1px solid var(--border); display:block;}
+  .bond-thumb-placeholder{width:42px; height:42px; border-radius:9px; background:var(--field-bg); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; color:#9AA5BC; flex-shrink:0;}
+  .bond-thumb-placeholder svg{width:18px; height:18px;}
+  .modal-thumb-preview{width:100%; height:120px; border-radius:9px; object-fit:cover; background:var(--field-bg); border:1px solid var(--border); margin-top:8px; display:block;}
+  .user-name{font-weight:600; font-size:13px;}
+  .user-email{font-size:11.5px; color:var(--ink-soft); margin-top:1px;}
+  .user-sub{font-size:11.5px; color:var(--ink-soft); margin-top:1px;}
+
+  .badge{display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap;}
+  .badge-dot{width:6px; height:6px; border-radius:50%; flex-shrink:0;}
+  .badge-active,.badge-success,.badge-approved,.badge-completed{background:#E9F9EF; color:#0F7A38;}
+  .badge-active .badge-dot,.badge-success .badge-dot,.badge-approved .badge-dot,.badge-completed .badge-dot{background:var(--green);}
+  .badge-admin{background:#F1E9FF; color:#6425D0;}
+  .badge-admin .badge-dot{background:var(--purple);}
+  .badge-nopin,.badge-pending{background:#FDF1E7; color:#B45F06;}
+  .badge-nopin .badge-dot,.badge-pending .badge-dot{background:var(--amber);}
+  .badge-rejected,.badge-failed{background:#FEECEC; color:#B42318;}
+  .badge-rejected .badge-dot,.badge-failed .badge-dot{background:var(--red);}
+  .badge-neutral{background:var(--field-bg); color:var(--ink-soft);}
+  .badge-neutral .badge-dot{background:#9AA5BC;}
+
+  .amount-pos{color:#0F7A38; font-weight:600;}
+  .amount-neg{color:var(--red); font-weight:600;}
+
+  .mono-cell{font-family:'IBM Plex Mono',monospace; font-size:12.5px;}
+  .empty-note{color:#9AA5BC;}
+
+  /* ---------- Buttons ---------- */
+  .btn-primary{padding:9px 15px; border-radius:9px; background:var(--blue); border:none; color:#fff; font-size:12.5px; font-weight:700;}
+  .btn-primary:hover{background:var(--blue-dark);}
+  .btn-secondary{padding:8px 13px; border-radius:8px; border:1px solid var(--border); background:#fff; font-size:12.5px; font-weight:600; color:var(--ink);}
+  .btn-secondary:hover{background:var(--field-bg);}
+  .btn-danger{padding:8px 13px; border-radius:8px; border:1px solid #FBD5D5; background:#FEF2F2; font-size:12.5px; font-weight:600; color:var(--red);}
+  .btn-danger:hover{background:#FDE6E6;}
+  .btn-xs{padding:5px 10px; font-size:11.5px; border-radius:7px; font-weight:700;}
+  .btn-approve{background:#E9F9EF; color:#0F7A38; border:1px solid #BFEBD0;}
+  .btn-approve:hover{background:#D9F3E3;}
+  .btn-reject{background:#FEECEC; color:#B42318; border:1px solid #FBD5D5;}
+  .btn-reject:hover{background:#FDDCDC;}
+  .table-actions{display:flex; gap:6px;}
+  .icon-btn-sm{width:28px; height:28px; border-radius:7px; border:1px solid var(--border); background:#fff; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); flex-shrink:0;}
+  .icon-btn-sm:hover{background:var(--field-bg);}
+  .icon-btn-sm svg{width:14px; height:14px;}
+  .disabled-note{font-size:11px; color:#9AA5BC; margin-top:8px; font-style:italic;}
+
+  /* ---------- Drawer ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(11,17,32,0.42); opacity:0; pointer-events:none;
+    transition:opacity 0.18s; z-index:60;
+  }
+  .overlay.open{opacity:1; pointer-events:auto;}
+  .drawer{
+    position:fixed; top:0; right:0; height:100vh; width:420px; background:#fff; z-index:61;
+    box-shadow:-8px 0 30px rgba(11,17,32,0.14); transform:translateX(100%); transition:transform 0.22s ease;
+    display:flex; flex-direction:column;
+  }
+  .drawer.open{transform:translateX(0);}
+  .drawer-head{padding:22px 22px 18px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; justify-content:space-between; gap:12px;}
+  .drawer-close{width:30px; height:30px; border-radius:50%; border:none; background:var(--field-bg); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .drawer-close svg{width:15px; height:15px; color:var(--ink-soft);}
+  .drawer-user{display:flex; align-items:center; gap:13px;}
+  .drawer-avatar{width:50px; height:50px; border-radius:50%; background:#EAF1FF; color:var(--blue); display:flex; align-items:center; justify-content:center; font-family:'Sora',sans-serif; font-weight:700; font-size:17px; flex-shrink:0;}
+  .drawer-user .name{font-size:16px; font-weight:700; font-family:'Sora',sans-serif;}
+  .drawer-user .email{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+
+  .drawer-body{padding:20px 22px; overflow-y:auto; flex:1;}
+  .drawer-section{margin-bottom:22px;}
+  .drawer-section:last-child{margin-bottom:0;}
+  .drawer-section-title{font-size:11px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:10px;}
+  .info-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .info-item .k{font-size:11.5px; color:var(--ink-soft); margin-bottom:3px;}
+  .info-item .v{font-size:13.5px; font-weight:600;}
+  .info-item .v.mono{font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:13px;}
+
+  .action-row{display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;}
+
+  /* ---------- Modal (Bonds / Spin wheel forms) ---------- */
+  .modal{
+    position:fixed; top:50%; left:calc(50% + 118px); transform:translate(-50%,-50%) scale(0.97); width:440px;
+    background:#fff; border-radius:16px; z-index:71; box-shadow:0 20px 60px rgba(11,17,32,0.22);
+    opacity:0; pointer-events:none; transition:opacity 0.16s, transform 0.16s;
+  }
+  .modal.open{opacity:1; pointer-events:auto; transform:translate(-50%,-50%) scale(1);}
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(11,17,32,0.42); opacity:0; pointer-events:none;
+    transition:opacity 0.16s; z-index:70;
+  }
+  .modal-overlay.open{opacity:1; pointer-events:auto;}
+  .modal-head{padding:20px 22px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border);}
+  .modal-head h3{font-size:15px; font-weight:700;}
+  .modal-body{padding:18px 22px;}
+  .modal-foot{padding:14px 22px 20px; display:flex; justify-content:flex-end; gap:8px;}
+  .form-row{margin-bottom:13px;}
+  .form-row-2{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:13px;}
+  .form-row label,.form-row-2 label{display:block; font-size:11.5px; font-weight:600; color:var(--ink-soft); margin-bottom:5px;}
+  .form-row input,.form-row-2 input,.form-row select,.form-row textarea{
+    width:100%; padding:9px 11px; border-radius:8px; border:1px solid var(--border); background:var(--field-bg);
+    font-size:13px; font-family:'Inter',sans-serif; color:var(--ink); outline:none;
+  }
+  .form-row input:focus,.form-row-2 input:focus,.form-row select:focus,.form-row textarea:focus{border-color:var(--blue); background:#fff;}
+  .form-row textarea{resize:vertical; min-height:76px; font-family:'Inter',sans-serif;}
+
+  /* ---------- Compose panel (Notifications) ---------- */
+  .compose-panel{background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:20px 22px; margin-bottom:22px;}
+  .compose-panel h3{font-size:14.5px; font-weight:700; margin-bottom:4px;}
+  .compose-panel .panel-head-sub{margin-bottom:16px;}
+  .compose-foot{display:flex; align-items:center; justify-content:space-between; margin-top:4px;}
+
+  /* ---------- Pages ---------- */
+  .page{display:none;}
+  .page.active{display:block;}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">V</div>
+      <div class="brand-text">VeraFund<span>Admin</span></div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Overview</div>
+      <button class="nav-item active" data-page="users" onclick="switchPage('users')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Users</span>
+      </button>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Money</div>
+      <button class="nav-item" data-page="transactions" onclick="switchPage('transactions')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg><span>Transactions</span></button>
+      <button class="nav-item" data-page="withdrawals" onclick="switchPage('withdrawals')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg><span>Withdrawals</span></button>
+      <button class="nav-item" data-page="fapshi" onclick="switchPage('fapshi')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg><span>Fapshi payments</span></button>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Products</div>
+      <button class="nav-item" data-page="bonds" onclick="switchPage('bonds')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4.9V17L12 22l-9-5.1V6.9L12 2z"/><path d="M12 22V12"/><path d="M21 7l-9 5-9-5"/></svg><span>Bonds</span></button>
+      <button class="nav-item" data-page="spin" onclick="switchPage('spin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span>Spin wheel</span></button>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Engagement</div>
+      <button class="nav-item" data-page="notifications" onclick="switchPage('notifications')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span>Notifications</span></button>
+      <button class="nav-item" data-page="referrals" onclick="switchPage('referrals')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4"/><path d="M15.4 6.5l-6.8 4"/></svg><span>Referrals</span></button>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="admin-chip">
+        <div class="admin-avatar">A</div>
+        <div class="admin-meta">
+          <div class="name">Admin</div>
+          <div class="role">Super admin</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <!-- ============ USERS PAGE ============ -->
+    <div class="page active" id="page-users">
+      <div class="topbar">
+        <div><h1>Users</h1><div class="topbar-sub">Everyone with a VeraFund account.</div></div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-card"><div class="label">Total users</div><div class="value" id="statTotal">—</div></div>
+        <div class="stat-card"><div class="label">New this week</div><div class="value" id="statNew">—</div></div>
+        <div class="stat-card"><div class="label">No transaction PIN</div><div class="value" id="statNoPin">—</div></div>
+        <div class="stat-card"><div class="label">Combined balance</div><div class="value mono-val" id="statBalance">—</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="search-field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" id="searchInput" placeholder="Search by name or email" oninput="renderUsers()">
+          </div>
+          <div class="filter-chips">
+            <button class="filter-chip active" data-filter="all" onclick="setFilter('all')">All</button>
+            <button class="filter-chip" data-filter="admin" onclick="setFilter('admin')">Admins</button>
+            <button class="filter-chip" data-filter="nopin" onclick="setFilter('nopin')">No PIN</button>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>User</th><th>Status</th><th>Wallet balance</th><th>Total deposited</th><th>Referral code</th><th>Joined</th></tr></thead>
+          <tbody id="usersTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ TRANSACTIONS PAGE ============ -->
+    <div class="page" id="page-transactions">
+      <div class="topbar">
+        <div><h1>Transactions</h1><div class="topbar-sub">Every wallet movement across VeraFund.</div></div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-card"><div class="label">Total transactions</div><div class="value" id="txStatTotal">—</div></div>
+        <div class="stat-card"><div class="label">Completed volume</div><div class="value mono-val" id="txStatVolume">—</div></div>
+        <div class="stat-card"><div class="label">Pending</div><div class="value" id="txStatPending">—</div></div>
+        <div class="stat-card"><div class="label">Failed</div><div class="value" id="txStatFailed">—</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="search-field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" id="txSearchInput" placeholder="Search by user" oninput="renderTransactions()">
+          </div>
+          <div class="filter-chips" id="txFilterChips">
+            <button class="filter-chip active" data-filter="all" onclick="setTxFilter('all')">All</button>
+            <button class="filter-chip" data-filter="deposit" onclick="setTxFilter('deposit')">Deposits</button>
+            <button class="filter-chip" data-filter="withdrawal" onclick="setTxFilter('withdrawal')">Withdrawals</button>
+            <button class="filter-chip" data-filter="bond_purchase" onclick="setTxFilter('bond_purchase')">Bonds</button>
+            <button class="filter-chip" data-filter="pending" onclick="setTxFilter('pending')">Pending</button>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>User</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody id="txTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ WITHDRAWALS PAGE ============ -->
+    <div class="page" id="page-withdrawals">
+      <div class="topbar">
+        <div><h1>Withdrawals</h1><div class="topbar-sub">Review and approve payout requests.</div></div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-card"><div class="label">Pending review</div><div class="value" id="wStatPending">—</div></div>
+        <div class="stat-card"><div class="label">Pending amount</div><div class="value mono-val" id="wStatPendingAmt">—</div></div>
+        <div class="stat-card"><div class="label">Approved</div><div class="value" id="wStatApproved">—</div></div>
+        <div class="stat-card"><div class="label">Rejected</div><div class="value" id="wStatRejected">—</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="filter-chips" id="wFilterChips">
+            <button class="filter-chip active" data-filter="all" onclick="setWFilter('all')">All</button>
+            <button class="filter-chip" data-filter="pending" onclick="setWFilter('pending')">Pending</button>
+            <button class="filter-chip" data-filter="approved" onclick="setWFilter('approved')">Approved</button>
+            <button class="filter-chip" data-filter="rejected" onclick="setWFilter('rejected')">Rejected</button>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Requested</th><th>Status</th><th></th></tr></thead>
+          <tbody id="wTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ FAPSHI PAGE ============ -->
+    <div class="page" id="page-fapshi">
+      <div class="topbar">
+        <div><h1>Fapshi payments</h1><div class="topbar-sub">MTN MoMo and Orange Money transactions via Fapshi.</div></div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-card"><div class="label">Successful</div><div class="value" id="fStatSuccess">—</div></div>
+        <div class="stat-card"><div class="label">Pending</div><div class="value" id="fStatPending">—</div></div>
+        <div class="stat-card"><div class="label">Failed</div><div class="value" id="fStatFailed">—</div></div>
+        <div class="stat-card"><div class="label">Successful volume</div><div class="value mono-val" id="fStatVolume">—</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="search-field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" id="fSearchInput" placeholder="Search by user or transaction ID" oninput="renderFapshi()">
+          </div>
+          <div class="filter-chips" id="fFilterChips">
+            <button class="filter-chip active" data-filter="all" onclick="setFFilter('all')">All</button>
+            <button class="filter-chip" data-filter="successful" onclick="setFFilter('successful')">Successful</button>
+            <button class="filter-chip" data-filter="pending" onclick="setFFilter('pending')">Pending</button>
+            <button class="filter-chip" data-filter="failed" onclick="setFFilter('failed')">Failed</button>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Transaction ID</th><th>User</th><th>Method</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody id="fTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ BONDS PAGE ============ -->
+    <div class="page" id="page-bonds">
+      <div class="topbar">
+        <div><h1>Bonds</h1><div class="topbar-sub">Government and corporate bond listings.</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div><h3>Bond listings</h3><div class="panel-head-sub">Shown to users on the Bonds tab of the dashboard.</div></div>
+          <button class="btn-primary" onclick="openBondModal(null)">+ Add bond</button>
+        </div>
+        <table>
+          <thead><tr><th></th><th>Name</th><th>Yield (p.a.)</th><th>Maturity</th><th>Min. buy-in</th><th>Est. daily earnings</th><th>Holders</th><th></th></tr></thead>
+          <tbody id="bondsTbody"></tbody>
+        </table>
+      </div>
+          </div>
+
+    <!-- ============ SPIN WHEEL PAGE ============ -->
+    <div class="page" id="page-spin">
+      <div class="topbar">
+        <div><h1>Spin wheel</h1><div class="topbar-sub">Reward segments for the daily spin.</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div><h3>Wheel segments</h3><div class="panel-head-sub">Ordered by position on the wheel.</div></div>
+          <button class="btn-primary" onclick="openSpinModal(null)">+ Add segment</button>
+        </div>
+        <table>
+          <thead><tr><th>Position</th><th>Reward amount</th><th></th></tr></thead>
+          <tbody id="spinTbody"></tbody>
+        </table>
+      </div>
+          </div>
+
+    <!-- ============ NOTIFICATIONS PAGE ============ -->
+    <div class="page" id="page-notifications">
+      <div class="topbar">
+        <div><h1>Notifications</h1><div class="topbar-sub">Broadcast a message to users.</div></div>
+      </div>
+      <div class="compose-panel">
+        <h3>Compose</h3>
+        <div class="panel-head-sub">This sends to the in-app notification bell — not push or SMS.</div>
+        <div class="form-row"><label>Title</label><input type="text" id="notifTitle" placeholder="e.g. New bond listed"></div>
+        <div class="form-row"><label>Message</label><textarea id="notifMessage" placeholder="Write the notification body..."></textarea></div>
+        <div class="form-row"><label>Audience</label>
+          <select id="notifAudience">
+            <option value="All users">All users</option>
+            <option value="Admins only">Admins only</option>
+            <option value="Users with no PIN set">Users with no PIN set</option>
+          </select>
+        </div>
+        <div class="compose-foot">
+          <div class="disabled-note" style="margin-top:0;">Adds to the list below only — not connected to Supabase yet.</div>
+          <button class="btn-primary" onclick="sendNotification()">Send notification</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><h3>Sent history</h3></div></div>
+        <table>
+          <thead><tr><th>Title</th><th>Message</th><th>Audience</th><th>Sent</th></tr></thead>
+          <tbody id="notifTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ REFERRALS PAGE ============ -->
+    <div class="page" id="page-referrals">
+      <div class="topbar">
+        <div><h1>Referrals</h1><div class="topbar-sub">Who's bringing in new users, and what they've earned.</div></div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-card"><div class="label">Total referrals</div><div class="value" id="rStatTotal">—</div></div>
+        <div class="stat-card"><div class="label">Active referrers</div><div class="value" id="rStatActive">—</div></div>
+        <div class="stat-card"><div class="label">Total paid out</div><div class="value mono-val" id="rStatPaid">—</div></div>
+        <div class="stat-card"><div class="label">Top referrer</div><div class="value" id="rStatTop" style="font-size:16px;">—</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><h3>Referral leaderboard</h3><div class="panel-head-sub">Sorted by friends referred.</div></div></div>
+        <table>
+          <thead><tr><th>User</th><th>Referral code</th><th>Friends referred</th><th>Earned</th></tr></thead>
+          <tbody id="refTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ============ USER DETAIL DRAWER ============ -->
+<div class="overlay" id="overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div class="drawer-user">
+      <div class="drawer-avatar" id="drawerAvatar">—</div>
+      <div><div class="name" id="drawerName">—</div><div class="email" id="drawerEmail">—</div></div>
+    </div>
+    <button class="drawer-close" onclick="closeDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <div class="drawer-section">
+      <div class="drawer-section-title">Account</div>
+      <div class="info-grid">
+        <div class="info-item"><div class="k">Joined</div><div class="v" id="drawerJoined">—</div></div>
+        <div class="info-item"><div class="k">Role</div><div class="v" id="drawerRole">—</div></div>
+        <div class="info-item"><div class="k">Transaction PIN</div><div class="v" id="drawerPin">—</div></div>
+        <div class="info-item"><div class="k">Referral code</div><div class="v mono" id="drawerReferral">—</div></div>
+      </div>
+    </div>
+    <div class="drawer-section">
+      <div class="drawer-section-title">Wallet</div>
+      <div class="info-grid">
+        <div class="info-item"><div class="k">Current balance</div><div class="v mono" id="drawerBalance">—</div></div>
+        <div class="info-item"><div class="k">Total deposited</div><div class="v mono" id="drawerDeposited">—</div></div>
+      </div>
+    </div>
+    <div class="drawer-section">
+      <div class="drawer-section-title">Actions</div>
+      <div class="action-row">
+        <button class="btn-secondary">Reset PIN</button>
+        <button class="btn-secondary">Grant admin</button>
+        <button class="btn-danger">Suspend account</button>
+      </div>
+      <div class="disabled-note">These buttons are placeholders for now — wired to hardcoded data, not connected to Supabase yet.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ GENERIC MODAL (Bonds / Spin wheel) ============ -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal()"></div>
+<div class="modal" id="modal">
+  <div class="modal-head"><h3 id="modalTitle">—</h3>
+    <button class="drawer-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div class="modal-body" id="modalBody"></div>
+  <div class="modal-foot">
+    <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+    <button class="btn-primary" id="modalSaveBtn">Save</button>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // Supabase client — same project as the dashboard/auth pages
+  // ============================================================
+  const SUPABASE_URL = 'https://rhyrniaftzdirwodbsjg.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJoeXJuaWFmdHpkaXJ3b2Ric2pnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTQ4NDksImV4cCI6MjEwMzE3MDg0OX0.5uiyuQkp3mbl7E4_4hTuI2Dx1eMLQ2UHepF8RF8Awx8';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ============================================================
+  // Live data — populated by loadUsers()/loadWithdrawals() below.
+  // Everything else on this page (Transactions, Fapshi, Bonds, Spin,
+  // Notifications, Referrals) is still mock data, not yet wired.
+  // ============================================================
+  let users = [];
+  let withdrawals = [];
+  let bonds = [];
+  let spinSegments = [];
+  let referrals = [];
+
+  async function loadUsers(){
+    try{
+      const { data, error } = await sb.rpc('admin_list_users');
+      if (error) throw error;
+      users = (data || []).map(u => ({
+        id: u.user_id,
+        full_name: u.full_name || u.email || 'Unnamed',
+        email: u.email,
+        is_admin: u.is_admin,
+        has_pin: u.has_pin,
+        referral_code: u.referral_code,
+        wallet_balance: u.wallet_balance,
+        total_deposited: u.total_deposited,
+        created_at: u.created_at
+      }));
+    } catch(e){
+      console.error('loadUsers failed', e);
+      users = [];
+    }
+  }
+
+  async function loadWithdrawals(){
+    try{
+      const { data, error } = await sb.rpc('admin_list_withdrawals');
+      if (error) throw error;
+      withdrawals = (data || []).map(w => ({
+        id: w.request_id,
+        user: w.full_name || w.email || 'Unknown',
+        amount: w.amount,
+        method: w.method,
+        phone: w.phone,
+        status: w.status,
+        requested_at: w.requested_at
+      }));
+    } catch(e){
+      console.error('loadWithdrawals failed', e);
+      withdrawals = [];
+    }
+  }
+
+  async function loadBonds(){
+    try{
+      const { data, error } = await sb.rpc('admin_list_bond_listings');
+      if (error) throw error;
+      bonds = (data || []).map(b => ({
+        id: b.id, name: b.name, yield_pct: b.yield_pct, maturity_year: b.maturity_year,
+        min_buyin: b.min_buyin, daily_est: b.daily_est, total_at_maturity: b.total_at_maturity,
+        image_url: b.image_url, holders: b.holders
+      }));
+    } catch(e){
+      console.error('loadBonds failed', e);
+      bonds = [];
+    }
+  }
+
+  async function loadSpinSegments(){
+    try{
+      const { data, error } = await sb.from('spin_wheel_segments').select('id,position,amount').order('position');
+      if (error) throw error;
+      spinSegments = data || [];
+    } catch(e){
+      console.error('loadSpinSegments failed', e);
+      spinSegments = [];
+    }
+  }
+
+  async function loadReferrals(){
+    try{
+      const { data, error } = await sb.rpc('admin_referral_leaderboard');
+      if (error) throw error;
+      referrals = (data || []).map(r => ({
+        user: r.full_name || 'Unnamed', code: r.referral_code,
+        friends: r.friends, earned: r.earned
+      }));
+    } catch(e){
+      console.error('loadReferrals failed', e);
+      referrals = [];
+    }
+  }
+
+  async function checkAdminAccess(){
+    const { data: userData, error: userErr } = await sb.auth.getUser();
+    if (userErr || !userData?.user){
+      window.location.href = 'index.html';
+      return false;
+    }
+    const { data: isAdmin, error: adminErr } = await sb.rpc('is_admin');
+    if (adminErr || !isAdmin){
+      alert("You don't have admin access to this page.");
+      window.location.href = 'index.html';
+      return false;
+    }
+    return true;
+  }
+
+  // ============================================================
+  // HARDCODED MOCK DATA — replace each block with live Supabase
+  // queries once the backend/RPC side is ready.
+  // ============================================================
+
+  const mockTransactions = [
+    { id:'t1', user:'Achille Ngono', type:'deposit', amount:150000, status:'completed', created_at:'2026-08-24T09:14:00', note:'Fapshi MTN MoMo top-up' },
+    { id:'t2', user:'Brenda Fokou', type:'withdrawal', amount:-40000, status:'completed', created_at:'2026-08-24T08:02:00', note:'Withdrawal to Orange Money' },
+    { id:'t3', user:'Delphine Mbah', type:'bond_purchase', amount:-200000, status:'completed', created_at:'2026-08-23T17:40:00', note:'Purchased Treasury Bond 2027' },
+    { id:'t4', user:'Flore Ngassa', type:'spin_reward', amount:2500, status:'completed', created_at:'2026-08-23T12:05:00', note:'Daily spin reward' },
+    { id:'t5', user:'Gaston Njoya', type:'referral_bonus', amount:5000, status:'completed', created_at:'2026-08-22T19:22:00', note:'Referral bonus — Huguette Simo joined' },
+    { id:'t6', user:'Eric Talla', type:'deposit', amount:5000, status:'pending', created_at:'2026-08-21T10:11:00', note:'Fapshi MTN MoMo top-up — awaiting confirmation' },
+    { id:'t7', user:'Collins Ateba', type:'deposit', amount:20000, status:'failed', created_at:'2026-08-19T15:47:00', note:'Fapshi Orange Money top-up — timed out' },
+    { id:'t8', user:'Achille Ngono', type:'withdrawal', amount:-60000, status:'pending', created_at:'2026-08-25T07:30:00', note:'Withdrawal to MTN MoMo — awaiting admin review' },
+  ];
+
+
+  const mockFapshi = [
+    { id:'FP-88213', user:'Achille Ngono', method:'MTN MoMo', amount:150000, status:'successful', created_at:'2026-08-24T09:14:00' },
+    { id:'FP-88190', user:'Eric Talla', method:'MTN MoMo', amount:5000, status:'pending', created_at:'2026-08-21T10:11:00' },
+    { id:'FP-88104', user:'Collins Ateba', method:'Orange Money', amount:20000, status:'failed', created_at:'2026-08-19T15:47:00' },
+    { id:'FP-88250', user:'Huguette Simo', method:'Orange Money', amount:5000, status:'successful', created_at:'2026-08-23T11:02:00' },
+    { id:'FP-88266', user:'Flore Ngassa', method:'MTN MoMo', amount:25000, status:'successful', created_at:'2026-08-22T16:40:00' },
+    { id:'FP-88271', user:'Gaston Njoya', method:'MTN MoMo', amount:8000, status:'pending', created_at:'2026-08-25T05:55:00' },
+  ];
+
+  const mockNotifications = [
+    { id:'n1', title:'New bond listed: SME Growth Note', message:'A new 11% yield bond is now open for subscription.', audience:'All users', sent_at:'2026-08-20T09:00:00' },
+    { id:'n2', title:'Scheduled maintenance', message:'VeraFund will be briefly unavailable tonight from 11PM to midnight.', audience:'All users', sent_at:'2026-08-15T14:30:00' },
+  ];
+
+  // ============================================================
+  // Shared helpers
+  // ============================================================
+
+  const dict = {
+    status_admin:'Admin', status_active:'Active', status_nopin:'No PIN set',
+    role_admin:'Admin', role_user:'User', pin_set:'Set', pin_not_set:'Not set',
+    no_results:'No users match this search.'
+  };
+
+  const TX_TYPE_LABEL = { deposit:'Deposit', withdrawal:'Withdrawal', bond_purchase:'Bond purchase', spin_reward:'Spin reward', referral_bonus:'Referral bonus' };
+  const TX_TYPE_BADGE = { deposit:'badge-active', withdrawal:'badge-neutral', bond_purchase:'badge-admin', spin_reward:'badge-pending', referral_bonus:'badge-active' };
+
+  function fmtXAF(n){ return 'XAF ' + Math.abs(n).toLocaleString('en-US'); }
+  function initials(name){ return name.split(/\s+/).map(p => p[0]).slice(0,2).join('').toUpperCase(); }
+  function fmtDate(iso){ return new Date(iso).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }); }
+  function fmtDateTime(iso){ return new Date(iso).toLocaleString('en-US', { year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }); }
+  function statusBadge(status, label){
+    const map = { completed:'badge-completed', pending:'badge-pending', failed:'badge-failed', approved:'badge-approved', rejected:'badge-rejected', successful:'badge-success' };
+    const cls = map[status] || 'badge-neutral';
+    return `<span class="badge ${cls}"><span class="badge-dot"></span>${label || (status.charAt(0).toUpperCase()+status.slice(1))}</span>`;
+  }
+
+  // ============================================================
+  // Page navigation
+  // ============================================================
+
+  function switchPage(page){
+    document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+  }
+
+  // ============================================================
+  // USERS
+  // ============================================================
+
+  let currentFilter = 'all';
+
+  function setFilter(f){
+    currentFilter = f;
+    document.querySelectorAll('#page-users .filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+    renderUsers();
+  }
+
+  function renderStats(){
+    const total = users.length;
+    const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+    const newThisWeek = users.filter(u => new Date(u.created_at) >= weekAgo).length;
+    const noPin = users.filter(u => !u.has_pin).length;
+    const combined = users.reduce((sum,u) => sum + u.wallet_balance, 0);
+    document.getElementById('statTotal').textContent = total.toLocaleString('en-US');
+    document.getElementById('statNew').textContent = newThisWeek.toLocaleString('en-US');
+    document.getElementById('statNoPin').textContent = noPin.toLocaleString('en-US');
+    document.getElementById('statBalance').textContent = fmtXAF(combined);
+  }
+
+  function renderUsers(){
+    const q = document.getElementById('searchInput').value.trim().toLowerCase();
+    let rows = users.filter(u => u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+    if (currentFilter === 'admin') rows = rows.filter(u => u.is_admin);
+    if (currentFilter === 'nopin') rows = rows.filter(u => !u.has_pin);
+
+    const tbody = document.getElementById('usersTbody');
+    if (rows.length === 0){
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:28px 20px; text-align:center;" class="empty-note">${dict.no_results}</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(u => {
+      let badge;
+      if (u.is_admin) badge = `<span class="badge badge-admin"><span class="badge-dot"></span>${dict.status_admin}</span>`;
+      else if (!u.has_pin) badge = `<span class="badge badge-nopin"><span class="badge-dot"></span>${dict.status_nopin}</span>`;
+      else badge = `<span class="badge badge-active"><span class="badge-dot"></span>${dict.status_active}</span>`;
+      return `
+        <tr class="is-clickable" onclick="openDrawer('${u.id}')">
+          <td><div class="user-cell"><div class="user-avatar">${initials(u.full_name)}</div><div><div class="user-name">${u.full_name}</div><div class="user-email">${u.email}</div></div></div></td>
+          <td>${badge}</td>
+          <td class="mono-cell">${fmtXAF(u.wallet_balance)}</td>
+          <td class="mono-cell">${fmtXAF(u.total_deposited)}</td>
+          <td class="mono-cell">${u.referral_code}</td>
+          <td>${fmtDate(u.created_at)}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  function openDrawer(id){
+    const u = users.find(x => x.id === id);
+    if (!u) return;
+    document.getElementById('drawerAvatar').textContent = initials(u.full_name);
+    document.getElementById('drawerName').textContent = u.full_name;
+    document.getElementById('drawerEmail').textContent = u.email;
+    document.getElementById('drawerJoined').textContent = fmtDate(u.created_at);
+    document.getElementById('drawerRole').textContent = u.is_admin ? dict.role_admin : dict.role_user;
+    document.getElementById('drawerPin').textContent = u.has_pin ? dict.pin_set : dict.pin_not_set;
+    document.getElementById('drawerReferral').textContent = u.referral_code;
+    document.getElementById('drawerBalance').textContent = fmtXAF(u.wallet_balance);
+    document.getElementById('drawerDeposited').textContent = fmtXAF(u.total_deposited);
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('drawer').classList.add('open');
+  }
+  function closeDrawer(){
+    document.getElementById('overlay').classList.remove('open');
+    document.getElementById('drawer').classList.remove('open');
+  }
+
+  // ============================================================
+  // TRANSACTIONS
+  // ============================================================
+
+  let txFilter = 'all';
+  function setTxFilter(f){
+    txFilter = f;
+    document.querySelectorAll('#txFilterChips .filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+    renderTransactions();
+  }
+  function renderTxStats(){
+    const total = mockTransactions.length;
+    const volume = mockTransactions.filter(t => t.status === 'completed').reduce((s,t) => s + Math.abs(t.amount), 0);
+    const pending = mockTransactions.filter(t => t.status === 'pending').length;
+    const failed = mockTransactions.filter(t => t.status === 'failed').length;
+    document.getElementById('txStatTotal').textContent = total.toLocaleString('en-US');
+    document.getElementById('txStatVolume').textContent = fmtXAF(volume);
+    document.getElementById('txStatPending').textContent = pending.toLocaleString('en-US');
+    document.getElementById('txStatFailed').textContent = failed.toLocaleString('en-US');
+  }
+  function renderTransactions(){
+    const q = document.getElementById('txSearchInput').value.trim().toLowerCase();
+    let rows = mockTransactions.filter(t => t.user.toLowerCase().includes(q));
+    if (txFilter === 'pending') rows = rows.filter(t => t.status === 'pending');
+    else if (txFilter !== 'all') rows = rows.filter(t => t.type === txFilter);
+    rows = rows.slice().sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+    const tbody = document.getElementById('txTbody');
+    if (rows.length === 0){
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:28px 20px; text-align:center;" class="empty-note">No transactions match this filter.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(t => `
+      <tr>
+        <td><div class="user-name">${t.user}</div></td>
+        <td><span class="badge ${TX_TYPE_BADGE[t.type]}"><span class="badge-dot"></span>${TX_TYPE_LABEL[t.type]}</span></td>
+        <td style="color:var(--ink-soft); font-size:12.5px;">${t.note}</td>
+        <td class="mono-cell ${t.amount >= 0 ? 'amount-pos' : 'amount-neg'}">${t.amount >= 0 ? '+' : '-'}${fmtXAF(t.amount)}</td>
+        <td>${statusBadge(t.status)}</td>
+        <td style="font-size:12.5px; color:var(--ink-soft);">${fmtDateTime(t.created_at)}</td>
+      </tr>`).join('');
+  }
+
+  // ============================================================
+  // WITHDRAWALS
+  // ============================================================
+
+  let wFilter = 'all';
+  function setWFilter(f){
+    wFilter = f;
+    document.querySelectorAll('#wFilterChips .filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+    renderWithdrawals();
+  }
+  function renderWStats(){
+    const pending = withdrawals.filter(w => w.status === 'pending');
+    const approved = withdrawals.filter(w => w.status === 'approved').length;
+    const rejected = withdrawals.filter(w => w.status === 'rejected').length;
+    document.getElementById('wStatPending').textContent = pending.length.toLocaleString('en-US');
+    document.getElementById('wStatPendingAmt').textContent = fmtXAF(pending.reduce((s,w) => s + w.amount, 0));
+    document.getElementById('wStatApproved').textContent = approved.toLocaleString('en-US');
+    document.getElementById('wStatRejected').textContent = rejected.toLocaleString('en-US');
+  }
+  function renderWithdrawals(){
+    let rows = wFilter === 'all' ? withdrawals : withdrawals.filter(w => w.status === wFilter);
+    rows = rows.slice().sort((a,b) => new Date(b.requested_at) - new Date(a.requested_at));
+    const tbody = document.getElementById('wTbody');
+    if (rows.length === 0){
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:28px 20px; text-align:center;" class="empty-note">No withdrawal requests here.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(w => `
+      <tr>
+        <td><div class="user-name">${w.user}</div></td>
+        <td class="mono-cell">${fmtXAF(w.amount)}</td>
+        <td><div>${w.method}</div><div class="user-sub mono">${w.phone}</div></td>
+        <td style="font-size:12.5px; color:var(--ink-soft);">${fmtDateTime(w.requested_at)}</td>
+        <td>${statusBadge(w.status)}</td>
+        <td>
+          ${w.status === 'pending'
+            ? `<div class="table-actions"><button class="btn-xs btn-approve" onclick="setWithdrawalStatus('${w.id}','approved')">Approve</button><button class="btn-xs btn-reject" onclick="setWithdrawalStatus('${w.id}','rejected')">Reject</button></div>`
+            : `<span class="empty-note" style="font-size:12px;">—</span>`}
+        </td>
+      </tr>`).join('');
+  }
+  async function setWithdrawalStatus(id, status){
+    const w = withdrawals.find(x => x.id === id);
+    if (!w) return;
+    if (!confirm(`${status === 'approved' ? 'Approve' : 'Reject'} ${w.user}'s withdrawal of ${fmtXAF(w.amount)}?`)) return;
+
+    try{
+      if (status === 'approved'){
+        const { error } = await sb.rpc('approve_withdrawal', { p_request_id: id });
+        if (error) throw error;
+      } else {
+        const reason = prompt('Reason for rejecting (optional):', '') || '';
+        const { error } = await sb.rpc('reject_withdrawal', { p_request_id: id, p_reason: reason });
+        if (error) throw error;
+      }
+    } catch(e){
+      console.error('setWithdrawalStatus failed', e);
+      alert('Something went wrong: ' + (e.message || 'unknown error'));
+      return;
+    }
+
+    await loadWithdrawals();
+    renderWStats();
+    renderWithdrawals();
+  }
+
+  // ============================================================
+  // FAPSHI PAYMENTS
+  // ============================================================
+
+  let fFilter = 'all';
+  function setFFilter(f){
+    fFilter = f;
+    document.querySelectorAll('#fFilterChips .filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+    renderFapshi();
+  }
+  function renderFStats(){
+    const success = mockFapshi.filter(f => f.status === 'successful');
+    const pending = mockFapshi.filter(f => f.status === 'pending').length;
+    const failed = mockFapshi.filter(f => f.status === 'failed').length;
+    document.getElementById('fStatSuccess').textContent = success.length.toLocaleString('en-US');
+    document.getElementById('fStatPending').textContent = pending.toLocaleString('en-US');
+    document.getElementById('fStatFailed').textContent = failed.toLocaleString('en-US');
+    document.getElementById('fStatVolume').textContent = fmtXAF(success.reduce((s,f) => s + f.amount, 0));
+  }
+  function renderFapshi(){
+    const q = document.getElementById('fSearchInput').value.trim().toLowerCase();
+    let rows = mockFapshi.filter(f => f.user.toLowerCase().includes(q) || f.id.toLowerCase().includes(q));
+    if (fFilter !== 'all') rows = rows.filter(f => f.status === fFilter);
+    rows = rows.slice().sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    const tbody = document.getElementById('fTbody');
+    if (rows.length === 0){
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:28px 20px; text-align:center;" class="empty-note">No payments match this search.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(f => `
+      <tr>
+        <td class="mono-cell">${f.id}</td>
+        <td><div class="user-name">${f.user}</div></td>
+        <td>${f.method}</td>
+        <td class="mono-cell">${fmtXAF(f.amount)}</td>
+        <td>${statusBadge(f.status)}</td>
+        <td style="font-size:12.5px; color:var(--ink-soft);">${fmtDateTime(f.created_at)}</td>
+      </tr>`).join('');
+  }
+
+  // ============================================================
+  // BONDS
+  // ============================================================
+
+  let currentModalSave = null;
+  let bondPendingImageUrl = '';
+
+  function handleBondImageUpload(event){
+    const file = event.target.files[0];
+    const img = document.getElementById('bondImagePreview');
+    if (!file){
+      bondPendingImageUrl = '';
+      img.removeAttribute('src');
+      img.style.display = 'none';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      bondPendingImageUrl = reader.result; // data URL, preview-only — swap for the real R2 URL once upload is wired up
+      img.src = bondPendingImageUrl;
+      img.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function renderBonds(){
+    const tbody = document.getElementById('bondsTbody');
+    if (bonds.length === 0){
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:28px 20px; text-align:center;" class="empty-note">No bonds listed yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = bonds.map(b => `
+      <tr>
+        <td>${b.image_url
+            ? `<img class="bond-thumb" src="${b.image_url}" alt="${b.name}" onerror="this.outerHTML='<div class=&quot;bond-thumb-placeholder&quot;><svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><rect x=&quot;3&quot; y=&quot;3&quot; width=&quot;18&quot; height=&quot;18&quot; rx=&quot;2&quot;/><circle cx=&quot;8.5&quot; cy=&quot;8.5&quot; r=&quot;1.5&quot;/><path d=&quot;M21 15l-5-5L5 21&quot;/></svg></div>'">`
+            : `<div class="bond-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>`}
+        </td>
+        <td><div class="user-name">${b.name}</div></td>
+        <td class="mono-cell">${b.yield_pct}% p.a.</td>
+        <td>${b.maturity_year}</td>
+        <td class="mono-cell">${fmtXAF(b.min_buyin)}</td>
+        <td class="mono-cell">${fmtXAF(b.daily_est)}/day</td>
+        <td>${b.holders}</td>
+        <td>
+          <div class="table-actions">
+            <button class="icon-btn-sm" onclick="openBondModal('${b.id}')" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="icon-btn-sm" onclick="deleteBond('${b.id}')" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  function openBondModal(bondId){
+    const b = bondId ? bonds.find(x => x.id === bondId) : null;
+    document.getElementById('modalTitle').textContent = b ? 'Edit bond' : 'Add bond';
+    document.getElementById('modalBody').innerHTML = `
+      <div class="form-row"><label>Name</label><input type="text" id="bondName" value="${b ? b.name : ''}" placeholder="e.g. Treasury Bond 2027"></div>
+      <div class="form-row-2">
+        <div><label>Yield % (p.a.)</label><input type="number" step="0.1" id="bondYield" value="${b ? b.yield_pct : ''}"></div>
+        <div><label>Maturity year</label><input type="number" id="bondMaturity" value="${b ? b.maturity_year : ''}"></div>
+      </div>
+      <div class="form-row-2">
+        <div><label>Minimum buy-in (XAF)</label><input type="number" id="bondMin" value="${b ? b.min_buyin : ''}"></div>
+        <div><label>Est. daily earnings (XAF)</label><input type="number" id="bondDaily" value="${b ? b.daily_est : ''}"></div>
+      </div>
+      <div class="form-row"><label>Total at maturity (XAF)</label><input type="number" id="bondTotal" value="${b ? b.total_at_maturity : ''}"></div>
+      <div class="form-row">
+        <label>Bond image</label>
+        <input type="file" id="bondImageFile" accept="image/*" onchange="handleBondImageUpload(event)">
+        <img class="modal-thumb-preview" id="bondImagePreview" src="${b && b.image_url ? b.image_url : ''}" style="${b && b.image_url ? '' : 'display:none;'}" onerror="this.style.display='none'" onload="this.style.display='block'">
+        <div class="disabled-note" style="margin-top:8px;">Preview only for now — picking a file shows it here but doesn't upload anywhere yet. Once the backend's ready this should send to Cloudflare R2, same as your other assets, and store the returned URL.</div>
+      </div>`;
+    bondPendingImageUrl = b ? b.image_url : '';
+    currentModalSave = async () => {
+      const name = document.getElementById('bondName').value.trim();
+      if (!name){ alert('Bond name is required.'); return false; }
+      const payload = {
+        p_id: b ? b.id : null,
+        p_name: name,
+        p_yield_pct: parseFloat(document.getElementById('bondYield').value) || 0,
+        p_maturity_year: parseInt(document.getElementById('bondMaturity').value) || 0,
+        p_min_buyin: parseInt(document.getElementById('bondMin').value) || 0,
+        p_daily_est: parseInt(document.getElementById('bondDaily').value) || 0,
+        p_total_at_maturity: parseInt(document.getElementById('bondTotal').value) || 0,
+        p_image_url: bondPendingImageUrl,
+      };
+      try{
+        const { error } = await sb.rpc('admin_upsert_bond_listing', payload);
+        if (error) throw error;
+      } catch(e){
+        console.error('admin_upsert_bond_listing failed', e);
+        alert('Failed to save bond: ' + (e.message || 'unknown error'));
+        return false;
+      }
+      await loadBonds();
+      renderBonds();
+      return true;
+    };
+    openModalShell();
+  }
+  async function deleteBond(id){
+    const b = bonds.find(x => x.id === id);
+    if (!b) return;
+    if (!confirm(`Remove "${b.name}" from bond listings?`)) return;
+    try{
+      const { error } = await sb.rpc('admin_delete_bond_listing', { p_id: id });
+      if (error) throw error;
+    } catch(e){
+      console.error('admin_delete_bond_listing failed', e);
+      alert(e.message === 'bond_has_holders'
+        ? "Can't delete — some users still hold this bond."
+        : 'Failed to delete bond: ' + (e.message || 'unknown error'));
+      return;
+    }
+    await loadBonds();
+    renderBonds();
+  }
+
+  // ============================================================
+  // SPIN WHEEL
+  // ============================================================
+
+  function renderSpin(){
+    const tbody = document.getElementById('spinTbody');
+    const rows = spinSegments.slice().sort((a,b) => a.position - b.position);
+    if (rows.length === 0){
+      tbody.innerHTML = `<tr><td colspan="3" style="padding:28px 20px; text-align:center;" class="empty-note">No segments configured.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(s => `
+      <tr>
+        <td>${s.position}</td>
+        <td class="mono-cell">${fmtXAF(s.amount)}</td>
+        <td>
+          <div class="table-actions">
+            <button class="icon-btn-sm" onclick="openSpinModal('${s.id}')" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="icon-btn-sm" onclick="deleteSpin('${s.id}')" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+  function openSpinModal(segId){
+    const s = segId ? spinSegments.find(x => x.id === segId) : null;
+    document.getElementById('modalTitle').textContent = s ? 'Edit segment' : 'Add segment';
+    document.getElementById('modalBody').innerHTML = `
+      <div class="form-row-2">
+        <div><label>Position on wheel</label><input type="number" id="spinPosition" value="${s ? s.position : spinSegments.length}"></div>
+        <div><label>Reward amount (XAF)</label><input type="number" id="spinAmount" value="${s ? s.amount : ''}"></div>
+      </div>`;
+    currentModalSave = async () => {
+      const position = parseInt(document.getElementById('spinPosition').value);
+      const amount = parseInt(document.getElementById('spinAmount').value) || 0;
+      if (isNaN(position) || position < 0){ alert('Position must be zero or a positive number.'); return false; }
+      try{
+        const { error } = await sb.rpc('admin_upsert_spin_segment', { p_id: s ? s.id : null, p_position: position, p_amount: amount });
+        if (error) throw error;
+      } catch(e){
+        console.error('admin_upsert_spin_segment failed', e);
+        alert('Failed to save segment: ' + (e.message || 'unknown error'));
+        return false;
+      }
+      await loadSpinSegments();
+      renderSpin();
+      return true;
+    };
+    openModalShell();
+  }
+  async function deleteSpin(id){
+    const s = spinSegments.find(x => x.id === id);
+    if (!s) return;
+    if (!confirm(`Remove the ${fmtXAF(s.amount)} segment at position ${s.position}?`)) return;
+    try{
+      const { error } = await sb.rpc('admin_delete_spin_segment', { p_id: id });
+      if (error) throw error;
+    } catch(e){
+      console.error('admin_delete_spin_segment failed', e);
+      alert('Failed to delete segment: ' + (e.message || 'unknown error'));
+      return;
+    }
+    await loadSpinSegments();
+    renderSpin();
+  }
+
+  // ---------- shared modal shell ----------
+  function openModalShell(){
+    document.getElementById('modalOverlay').classList.add('open');
+    document.getElementById('modal').classList.add('open');
+    document.getElementById('modalSaveBtn').onclick = () => {
+      if (currentModalSave && currentModalSave() !== false) closeModal();
+    };
+  }
+  function closeModal(){
+    document.getElementById('modalOverlay').classList.remove('open');
+    document.getElementById('modal').classList.remove('open');
+    currentModalSave = null;
+  }
+
+  // ============================================================
+  // NOTIFICATIONS
+  // ============================================================
+
+  function renderNotifications(){
+    const tbody = document.getElementById('notifTbody');
+    const rows = mockNotifications.slice().sort((a,b) => new Date(b.sent_at) - new Date(a.sent_at));
+    if (rows.length === 0){
+      tbody.innerHTML = `<tr><td colspan="4" style="padding:28px 20px; text-align:center;" class="empty-note">Nothing sent yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(n => `
+      <tr>
+        <td><div class="user-name">${n.title}</div></td>
+        <td style="color:var(--ink-soft); font-size:12.5px; max-width:280px;">${n.message}</td>
+        <td>${n.audience}</td>
+        <td style="font-size:12.5px; color:var(--ink-soft);">${fmtDateTime(n.sent_at)}</td>
+      </tr>`).join('');
+  }
+  function sendNotification(){
+    const title = document.getElementById('notifTitle').value.trim();
+    const message = document.getElementById('notifMessage').value.trim();
+    const audience = document.getElementById('notifAudience').value;
+    if (!title || !message){ alert('Title and message are both required.'); return; }
+    mockNotifications.push({ id:'n' + (mockNotifications.length + 1) + '_' + Date.now(), title, message, audience, sent_at: new Date().toISOString() });
+    document.getElementById('notifTitle').value = '';
+    document.getElementById('notifMessage').value = '';
+    renderNotifications();
+    alert('Notification sent (mock) — not connected to Supabase yet.');
+  }
+
+  // ============================================================
+  // REFERRALS
+  // ============================================================
+
+  function renderReferrals(){
+    const rows = referrals.slice().sort((a,b) => b.friends - a.friends);
+    const total = rows.reduce((s,r) => s + r.friends, 0);
+    const active = rows.filter(r => r.friends > 0).length;
+    const paid = rows.reduce((s,r) => s + r.earned, 0);
+    document.getElementById('rStatTotal').textContent = total.toLocaleString('en-US');
+    document.getElementById('rStatActive').textContent = active.toLocaleString('en-US');
+    document.getElementById('rStatPaid').textContent = fmtXAF(paid);
+    document.getElementById('rStatTop').textContent = rows[0] ? rows[0].user : '—';
+
+    const tbody = document.getElementById('refTbody');
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td><div class="user-cell"><div class="user-avatar">${initials(r.user)}</div><div class="user-name">${r.user}</div></div></td>
+        <td class="mono-cell">${r.code}</td>
+        <td>${r.friends}</td>
+        <td class="mono-cell">${fmtXAF(r.earned)}</td>
+      </tr>`).join('');
+  }
+
+  // ============================================================
+  // INIT
+  // ============================================================
+
+  (async function init(){
+    const allowed = await checkAdminAccess();
+    if (!allowed) return;
+
+    await Promise.all([loadUsers(), loadWithdrawals(), loadBonds(), loadSpinSegments(), loadReferrals()]);
+    renderStats(); renderUsers();
+    renderWStats(); renderWithdrawals();
+    renderBonds();
+    renderSpin();
+    renderReferrals();
+
+    // Still mock data — not yet wired to Supabase.
+    renderTxStats(); renderTransactions();
+    renderFStats(); renderFapshi();
+    renderNotifications();
+  })();
+</script>
+</body>
+</html>

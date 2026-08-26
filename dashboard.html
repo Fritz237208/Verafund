@@ -1672,12 +1672,15 @@
 
   async function loadSpinSegments(){
     loadingState.spin = true; fetchError.spin = false;
-    const FALLBACK_SEGMENTS = [500, 2000, 1000, 5000, 500, 1500, 1000, 10000];
+    const FALLBACK_SEGMENTS = [
+      {position:0, amount:500}, {position:1, amount:2000}, {position:2, amount:1000}, {position:3, amount:5000},
+      {position:4, amount:500}, {position:5, amount:1500}, {position:6, amount:1000}, {position:7, amount:10000}
+    ];
     try{
       const { data, error } = await sb
-        .from('spin_wheel_segments').select('amount').order('position', {ascending:true});
+        .from('spin_wheel_segments').select('position,amount').order('position', {ascending:true});
       if (error) throw error;
-      spinAmounts = (data && data.length) ? data.map(row => row.amount) : FALLBACK_SEGMENTS;
+      spinAmounts = (data && data.length) ? data : FALLBACK_SEGMENTS;
     } catch(e){
       console.error('loadSpinSegments failed', e);
       fetchError.spin = true;
@@ -2736,8 +2739,9 @@
   let spinSegments = [];
 
   function rebuildSpinSegments(){
-    spinSegments = spinAmounts.map((amount, i) => ({
-      amount,
+    spinSegments = spinAmounts.map((seg, i) => ({
+      position: seg.position,
+      amount: seg.amount,
       color: SPIN_COLOR_PALETTE[i % SPIN_COLOR_PALETTE.length]
     }));
   }
@@ -2838,9 +2842,12 @@
       return;
     }
 
-    // spin_wheel_segments.position is assumed 0-indexed and contiguous,
-    // matching the order spinSegments was built in (see loadSpinSegments).
-    const winnerIndex = claim.segment_position;
+    // Find the array slot whose real `position` value matches what the
+    // server picked — NOT assumed to equal claim.segment_position itself,
+    // since admin-entered positions aren't guaranteed to be contiguous
+    // starting at 0 (e.g. after deleting a middle segment).
+    let winnerIndex = spinSegments.findIndex(seg => seg.position === claim.segment_position);
+    if (winnerIndex === -1) winnerIndex = 0; // defensive fallback, shouldn't happen
     const n = spinSegments.length;
     const segAngle = 360 / n;
     const winnerMid = winnerIndex * segAngle + segAngle / 2;
