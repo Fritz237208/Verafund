@@ -850,6 +850,21 @@
     display:flex; padding:8px 6px calc(8px + env(safe-area-inset-bottom));
     z-index:50;
   }
+  .support-fab{
+    position:fixed;
+    right:calc(50% - 230px + 18px);
+    bottom:calc(78px + env(safe-area-inset-bottom));
+    width:52px; height:52px; border-radius:50%;
+    background:var(--brand, #155EEF); color:white;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 8px 20px rgba(21,94,239,0.35);
+    border:none; cursor:pointer; z-index:60;
+    text-decoration:none;
+  }
+  .support-fab svg{width:24px; height:24px;}
+  @media (max-width: 460px){
+    .support-fab{ right:18px; }
+  }
   .tab-item{
     flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;
     background:none; border:none; padding:6px 0; color:var(--ink-soft);
@@ -1136,6 +1151,9 @@
 
   <!-- ============ PROFILE ============ -->
   <div class="tab-panel" id="tab-profile">
+    <a class="support-fab" href="https://t.me/verafund237" target="_blank" rel="noopener noreferrer" aria-label="Contact support on Telegram">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.05 3.6 2.87 10.6c-1.24.49-1.23 1.17-.23 1.47l4.67 1.46 1.8 5.62c.22.62.11.86.76.86.5 0 .72-.23.99-.5l2.38-2.31 4.94 3.65c.91.5 1.56.24 1.79-.84l3.24-15.27c.33-1.32-.5-1.92-1.16-1.64Zm-12.2 11.5-1.13-3.74L17.4 6.7c.3-.18.58.04.33.24l-8.88 8.16Z"/></svg>
+    </a>
     <div class="section-title" data-i18n="profile_title">Profile</div>
     <div class="section-sub" data-i18n="profile_sub">Manage your account and preferences.</div>
 
@@ -1291,7 +1309,7 @@
         </div>
       </div>
 
-      <button class="pref-card" style="width:100%; border:none; cursor:pointer; text-align:left;" onclick="switchTab('profile')">
+      <button class="pref-card" style="width:100%; border:none; cursor:pointer; text-align:left;" onclick="window.open('https://t.me/verafund237', '_blank', 'noopener,noreferrer')">
         <span class="pref-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         </span>
