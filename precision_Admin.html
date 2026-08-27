@@ -509,7 +509,6 @@
           </select>
         </div>
         <div class="compose-foot">
-          <div class="disabled-note" style="margin-top:0;">Adds to the list below only — not connected to Supabase yet.</div>
           <button class="btn-primary" onclick="sendNotification()">Send notification</button>
         </div>
       </div>
@@ -615,6 +614,7 @@
   let bonds = [];
   let spinSegments = [];
   let referrals = [];
+  let notifications = [];
 
   async function loadUsers(){
     try{
@@ -791,11 +791,6 @@
     { id:'FP-88250', user:'Huguette Simo', method:'Orange Money', amount:5000, status:'successful', created_at:'2026-08-23T11:02:00' },
     { id:'FP-88266', user:'Flore Ngassa', method:'MTN MoMo', amount:25000, status:'successful', created_at:'2026-08-22T16:40:00' },
     { id:'FP-88271', user:'Gaston Njoya', method:'MTN MoMo', amount:8000, status:'pending', created_at:'2026-08-25T05:55:00' },
-  ];
-
-  const mockNotifications = [
-    { id:'n1', title:'New bond listed: SME Growth Note', message:'A new 11% yield bond is now open for subscription.', audience:'All users', sent_at:'2026-08-20T09:00:00' },
-    { id:'n2', title:'Scheduled maintenance', message:'VeraFund will be briefly unavailable tonight from 11PM to midnight.', audience:'All users', sent_at:'2026-08-15T14:30:00' },
   ];
 
   // ============================================================
@@ -1252,9 +1247,23 @@
   // NOTIFICATIONS
   // ============================================================
 
+  async function loadNotifications(){
+    try{
+      const { data, error } = await sb.rpc('admin_list_broadcasts');
+      if (error) throw error;
+      notifications = (data || []).map(n => ({
+        id: n.id, title: n.title, message: n.message,
+        audience: n.audience, recipients: n.recipients, sent_at: n.sent_at
+      }));
+    } catch(e){
+      console.error('loadNotifications failed', e);
+      notifications = [];
+    }
+  }
+
   function renderNotifications(){
     const tbody = document.getElementById('notifTbody');
-    const rows = mockNotifications.slice().sort((a,b) => new Date(b.sent_at) - new Date(a.sent_at));
+    const rows = notifications.slice().sort((a,b) => new Date(b.sent_at) - new Date(a.sent_at));
     if (rows.length === 0){
       tbody.innerHTML = `<tr><td colspan="4" style="padding:28px 20px; text-align:center;" class="empty-note">Nothing sent yet.</td></tr>`;
       return;
@@ -1263,20 +1272,31 @@
       <tr>
         <td><div class="user-name">${n.title}</div></td>
         <td style="color:var(--ink-soft); font-size:12.5px; max-width:280px;">${n.message}</td>
-        <td>${n.audience}</td>
+        <td>${n.audience} <span style="color:var(--ink-soft);">(${n.recipients})</span></td>
         <td style="font-size:12.5px; color:var(--ink-soft);">${fmtDateTime(n.sent_at)}</td>
       </tr>`).join('');
   }
-  function sendNotification(){
+  async function sendNotification(){
     const title = document.getElementById('notifTitle').value.trim();
     const message = document.getElementById('notifMessage').value.trim();
     const audience = document.getElementById('notifAudience').value;
     if (!title || !message){ alert('Title and message are both required.'); return; }
-    mockNotifications.push({ id:'n' + (mockNotifications.length + 1) + '_' + Date.now(), title, message, audience, sent_at: new Date().toISOString() });
-    document.getElementById('notifTitle').value = '';
-    document.getElementById('notifMessage').value = '';
-    renderNotifications();
-    alert('Notification sent (mock) — not connected to Supabase yet.');
+    if (!confirm(`Send this to "${audience}"?`)) return;
+
+    try{
+      const { data, error } = await sb.rpc('admin_broadcast_notification', {
+        p_title: title, p_message: message, p_audience: audience
+      });
+      if (error) throw error;
+      document.getElementById('notifTitle').value = '';
+      document.getElementById('notifMessage').value = '';
+      await loadNotifications();
+      renderNotifications();
+      alert(`Sent to ${data} recipient(s).`);
+    } catch(e){
+      console.error('admin_broadcast_notification failed', e);
+      alert('Failed to send: ' + (e.message || 'unknown error'));
+    }
   }
 
   // ============================================================
@@ -1308,17 +1328,17 @@
   // ============================================================
 
   async function startAdminApp(){
-    await Promise.all([loadUsers(), loadWithdrawals(), loadBonds(), loadSpinSegments(), loadReferrals()]);
+    await Promise.all([loadUsers(), loadWithdrawals(), loadBonds(), loadSpinSegments(), loadReferrals(), loadNotifications()]);
     renderStats(); renderUsers();
     renderWStats(); renderWithdrawals();
     renderBonds();
     renderSpin();
     renderReferrals();
+    renderNotifications();
 
     // Still mock data — not yet wired to Supabase.
     renderTxStats(); renderTransactions();
     renderFStats(); renderFapshi();
-    renderNotifications();
   }
 
   (async function init(){
