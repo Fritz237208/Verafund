@@ -1853,10 +1853,25 @@
     }
     if (!confirm(`${dict.invest_confirm_prefix || 'Invest'} ${fmtXAF(amount)} ${dict.invest_confirm_in || 'in'} ${bondName}?`)) return;
 
+    let data;
     try{
-      const { data, error } = await sb.rpc('invest_in_bond', { p_bond_id: bondId, p_amount: amount });
-      if (error) throw error;
+      const resp = await sb.rpc('invest_in_bond', { p_bond_id: bondId, p_amount: amount });
+      if (resp.error) throw resp.error;
+      data = resp.data;
+    } catch(e){
+      console.error('invest_in_bond failed', e);
+      const msg = e.message === 'insufficient_balance' ? dict.insufficient_balance
+                : e.message === 'below_minimum' ? (dict.invest_below_min || 'Amount is below the minimum buy-in.')
+                : dict.fetch_error_msg;
+      alert(msg);
+      return; // the actual investment genuinely did not happen — stop here
+    }
 
+    // From here on, the investment ALREADY succeeded server-side (money
+    // moved, bond purchased). Anything below is just refreshing the UI to
+    // reflect that — if one of these hiccups, it must never surface as an
+    // "investment failed" error, since it didn't.
+    try{
       walletBalance = data.balance;
       renderWallet();
 
@@ -1870,18 +1885,14 @@
       renderActivity();
 
       await loadBonds(); // refreshes myBonds with the new holding
-
-      if (data.first_investment){
-        alert(dict.invest_success_first || 'Investment successful! Referral bonuses (if any) have been paid out to your referrers.');
-      } else {
-        alert(dict.invest_success || 'Investment successful!');
-      }
     } catch(e){
-      console.error('invest_in_bond failed', e);
-      const msg = e.message === 'insufficient_balance' ? dict.insufficient_balance
-                : e.message === 'below_minimum' ? (dict.invest_below_min || 'Amount is below the minimum buy-in.')
-                : dict.fetch_error_msg;
-      alert(msg);
+      console.error('investInBond UI refresh failed (investment itself succeeded)', e);
+    }
+
+    if (data.first_investment){
+      alert(dict.invest_success_first || 'Investment successful! Referral bonuses (if any) have been paid out to your referrers.');
+    } else {
+      alert(dict.invest_success || 'Investment successful!');
     }
   }
 

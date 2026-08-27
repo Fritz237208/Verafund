@@ -40,6 +40,42 @@
   /* ---------- Shell ---------- */
   .shell{display:flex; min-height:100vh;}
 
+  /* ---------- Embedded admin login ---------- */
+  .admin-login-screen{
+    position:fixed; inset:0; background:var(--bg); z-index:1000;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .admin-login-card{
+    width:100%; max-width:380px; background:var(--card-bg); border:1px solid var(--border);
+    border-radius:18px; padding:32px 28px; box-shadow:0 12px 32px rgba(11,17,32,0.08);
+  }
+  .admin-login-brand{display:flex; align-items:center; gap:10px; margin-bottom:22px;}
+  .admin-login-mark{
+    width:32px; height:32px; border-radius:8px; background:var(--blue); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-family:'Sora',sans-serif;
+    font-weight:800; font-size:15px; flex-shrink:0;
+  }
+  .admin-login-title{font-family:'Sora',sans-serif; font-weight:700; font-size:16px;}
+  .admin-login-title span{display:block; font-weight:500; font-size:11px; color:var(--ink-soft); margin-top:1px;}
+  .admin-login-h1{font-family:'Sora',sans-serif; font-size:20px; font-weight:700; margin-bottom:4px;}
+  .admin-login-sub{font-size:13px; color:var(--ink-soft); margin-bottom:22px;}
+  .admin-login-row{margin-bottom:14px;}
+  .admin-login-row label{display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px;}
+  .admin-login-row input{
+    width:100%; padding:11px 13px; border-radius:10px; border:1px solid var(--border);
+    background:var(--field-bg); font-size:14px; font-family:inherit; color:var(--ink);
+  }
+  .admin-login-row input:focus{outline:2px solid var(--blue); outline-offset:1px;}
+  .admin-login-error{
+    background:#FEF2F2; border:1px solid #FCD3D3; color:var(--red); border-radius:10px;
+    padding:10px 12px; font-size:12.5px; font-weight:600; margin-bottom:14px; display:none;
+  }
+  .admin-login-submit{
+    width:100%; padding:12px; border:none; border-radius:10px; background:var(--blue); color:#fff;
+    font-size:14.5px; font-weight:700; margin-top:4px;
+  }
+  .admin-login-submit:disabled{opacity:0.6; cursor:not-allowed;}
+
   .sidebar{
     width:236px; flex-shrink:0; background:var(--navy); color:#fff;
     display:flex; flex-direction:column; padding:22px 14px;
@@ -230,6 +266,27 @@
 </style>
 </head>
 <body>
+
+<div class="admin-login-screen" id="adminLoginScreen" style="display:none;">
+  <div class="admin-login-card">
+    <div class="admin-login-brand">
+      <div class="admin-login-mark">V</div>
+      <div class="admin-login-title">VeraFund<span>Admin</span></div>
+    </div>
+    <div class="admin-login-h1">Admin sign in</div>
+    <div class="admin-login-sub">Restricted to authorized administrators only.</div>
+    <div class="admin-login-error" id="adminLoginError"></div>
+    <div class="admin-login-row">
+      <label for="adminLoginEmail">Email</label>
+      <input type="email" id="adminLoginEmail" autocomplete="username" placeholder="you@verafund.app">
+    </div>
+    <div class="admin-login-row">
+      <label for="adminLoginPassword">Password</label>
+      <input type="password" id="adminLoginPassword" autocomplete="current-password" placeholder="Enter password" onkeydown="if(event.key==='Enter') handleAdminLogin();">
+    </div>
+    <button class="admin-login-submit" id="adminLoginSubmit" onclick="handleAdminLogin()">Sign in</button>
+  </div>
+</div>
 
 <div class="shell">
   <!-- ============ SIDEBAR ============ -->
@@ -639,19 +696,75 @@
     }
   }
 
+  // Returns true if already signed in as an admin (shows nothing).
+  // Otherwise shows the embedded login screen and returns false —
+  // the caller should stop and wait for handleAdminLogin() to proceed.
   async function checkAdminAccess(){
     const { data: userData, error: userErr } = await sb.auth.getUser();
     if (userErr || !userData?.user){
-      window.location.href = 'index.html';
+      showAdminLoginScreen();
       return false;
     }
     const { data: isAdmin, error: adminErr } = await sb.rpc('is_admin');
     if (adminErr || !isAdmin){
-      alert("You don't have admin access to this page.");
-      window.location.href = 'index.html';
+      await sb.auth.signOut(); // don't leave a signed-in-but-not-admin session sitting around
+      showAdminLoginScreen("This account doesn't have admin access.");
       return false;
     }
     return true;
+  }
+
+  function showAdminLoginScreen(errorMsg){
+    document.getElementById('adminLoginScreen').style.display = 'flex';
+    const errEl = document.getElementById('adminLoginError');
+    if (errorMsg){
+      errEl.textContent = errorMsg;
+      errEl.style.display = 'block';
+    } else {
+      errEl.style.display = 'none';
+    }
+  }
+
+  function hideAdminLoginScreen(){
+    document.getElementById('adminLoginScreen').style.display = 'none';
+  }
+
+  async function handleAdminLogin(){
+    const email = document.getElementById('adminLoginEmail').value.trim();
+    const password = document.getElementById('adminLoginPassword').value;
+    const errEl = document.getElementById('adminLoginError');
+    const btn = document.getElementById('adminLoginSubmit');
+
+    if (!email || !password){
+      errEl.textContent = 'Enter both email and password.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+
+    const { error: loginErr } = await sb.auth.signInWithPassword({ email, password });
+    if (loginErr){
+      errEl.textContent = 'Incorrect email or password.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+      return;
+    }
+
+    const { data: isAdmin, error: adminErr } = await sb.rpc('is_admin');
+    if (adminErr || !isAdmin){
+      await sb.auth.signOut();
+      errEl.textContent = "This account doesn't have admin access.";
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+      return;
+    }
+
+    hideAdminLoginScreen();
+    await startAdminApp();
   }
 
   // ============================================================
@@ -1194,10 +1307,7 @@
   // INIT
   // ============================================================
 
-  (async function init(){
-    const allowed = await checkAdminAccess();
-    if (!allowed) return;
-
+  async function startAdminApp(){
     await Promise.all([loadUsers(), loadWithdrawals(), loadBonds(), loadSpinSegments(), loadReferrals()]);
     renderStats(); renderUsers();
     renderWStats(); renderWithdrawals();
@@ -1209,6 +1319,12 @@
     renderTxStats(); renderTransactions();
     renderFStats(); renderFapshi();
     renderNotifications();
+  }
+
+  (async function init(){
+    const allowed = await checkAdminAccess();
+    if (!allowed) return; // login screen is now showing; startAdminApp() runs after handleAdminLogin() succeeds
+    await startAdminApp();
   })();
 </script>
 </body>
