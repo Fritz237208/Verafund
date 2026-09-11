@@ -263,6 +263,56 @@
   /* ---------- Pages ---------- */
   .page{display:none;}
   .page.active{display:block;}
+
+  /* ---------- Table scroll wrapper (mobile) ---------- */
+  .table-wrap{width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  .table-wrap table{min-width:640px;}
+
+  /* ---------- Mobile topbar / hamburger ---------- */
+  .mobile-topbar{
+    display:none; align-items:center; gap:12px; position:sticky; top:0; z-index:40;
+    background:var(--bg); padding:14px 16px; border-bottom:1px solid var(--border);
+  }
+  .hamburger-btn{
+    width:36px; height:36px; border-radius:9px; border:1px solid var(--border); background:#fff;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--ink);
+  }
+  .hamburger-btn svg{width:19px; height:19px;}
+  .mobile-topbar .brand-text{color:var(--ink); font-size:14px;}
+  .mobile-topbar .brand-text span{color:var(--ink-soft);}
+  .sidebar-overlay{
+    position:fixed; inset:0; background:rgba(11,17,32,0.42); z-index:79;
+    opacity:0; pointer-events:none; transition:opacity 0.18s;
+  }
+  .sidebar-overlay.open{opacity:1; pointer-events:auto;}
+
+  /* ---------- Responsive breakpoints ---------- */
+  @media (max-width: 900px){
+    .mobile-topbar{display:flex;}
+    .sidebar{
+      position:fixed; left:0; top:0; z-index:80; width:250px;
+      transform:translateX(-100%); transition:transform 0.22s ease; box-shadow:0 0 40px rgba(0,0,0,0.25);
+    }
+    .sidebar.open{transform:translateX(0);}
+    .main{padding:18px 16px 48px; width:100%;}
+    .topbar{flex-direction:column; align-items:flex-start; gap:8px;}
+    .topbar-actions{width:100%;}
+    .stat-row{grid-template-columns:repeat(2,1fr); gap:10px;}
+    .stat-card{padding:13px 14px;}
+    .stat-card .value{font-size:19px;}
+    .panel-head{flex-direction:column; align-items:stretch;}
+    .search-field{width:100%;}
+    .head-controls{width:100%; justify-content:flex-start;}
+    .drawer{width:100%; max-width:420px;}
+    .modal{left:50%; width:calc(100% - 28px); max-width:440px;}
+    .form-row-2{grid-template-columns:1fr;}
+    .info-grid{grid-template-columns:1fr;}
+  }
+  @media (max-width: 480px){
+    .stat-row{grid-template-columns:1fr 1fr;}
+    .modal-body{padding:16px 18px;}
+    .modal-head, .modal-foot{padding-left:18px; padding-right:18px;}
+  }
 </style>
 </head>
 <body>
@@ -288,7 +338,17 @@
   </div>
 </div>
 
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
 <div class="shell">
+  <!-- ============ MOBILE TOPBAR ============ -->
+  <div class="mobile-topbar">
+    <button class="hamburger-btn" onclick="openSidebar()" aria-label="Open menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="brand-text">VeraFund<span>Admin</span></div>
+  </div>
+
   <!-- ============ SIDEBAR ============ -->
   <aside class="sidebar">
     <div class="brand">
@@ -360,10 +420,12 @@
             <button class="filter-chip" data-filter="nopin" onclick="setFilter('nopin')">No PIN</button>
           </div>
         </div>
+        <div class="table-wrap">
         <table>
           <thead><tr><th>User</th><th>Status</th><th>Wallet balance</th><th>Total deposited</th><th>Referral code</th><th>Joined</th></tr></thead>
           <tbody id="usersTbody"></tbody>
         </table>
+        </div>
       </div>
     </div>
 
@@ -392,10 +454,12 @@
             <button class="filter-chip" data-filter="pending" onclick="setTxFilter('pending')">Pending</button>
           </div>
         </div>
+        <div class="table-wrap">
         <table>
           <thead><tr><th>User</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
           <tbody id="txTbody"></tbody>
         </table>
+        </div>
       </div>
     </div>
 
@@ -419,10 +483,12 @@
             <button class="filter-chip" data-filter="rejected" onclick="setWFilter('rejected')">Rejected</button>
           </div>
         </div>
+        <div class="table-wrap">
         <table>
           <thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Requested</th><th>Status</th><th></th></tr></thead>
           <tbody id="wTbody"></tbody>
         </table>
+        </div>
       </div>
     </div>
 
@@ -450,10 +516,12 @@
             <button class="filter-chip" data-filter="failed" onclick="setFFilter('failed')">Failed</button>
           </div>
         </div>
+        <div class="table-wrap">
         <table>
           <thead><tr><th>Transaction ID</th><th>User</th><th>Method</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
           <tbody id="fTbody"></tbody>
         </table>
+        </div>
       </div>
     </div>
 
@@ -467,10 +535,12 @@
           <div><h3>Bond listings</h3><div class="panel-head-sub">Shown to users on the Bonds tab of the dashboard.</div></div>
           <button class="btn-primary" onclick="openBondModal(null)">+ Add bond</button>
         </div>
+        <div class="table-wrap">
         <table>
           <thead><tr><th></th><th>Name</th><th>Yield (p.a.)</th><th>Maturity</th><th>Min. buy-in</th><th>Est. daily earnings</th><th>Holders</th><th></th></tr></thead>
           <tbody id="bondsTbody"></tbody>
         </table>
+        </div>
       </div>
           </div>
 
@@ -484,10 +554,12 @@
           <div><h3>Wheel segments</h3><div class="panel-head-sub">Ordered by position on the wheel.</div></div>
           <button class="btn-primary" onclick="openSpinModal(null)">+ Add segment</button>
         </div>
+        <div class="table-wrap">
         <table>
           <thead><tr><th>Position</th><th>Reward amount</th><th></th></tr></thead>
           <tbody id="spinTbody"></tbody>
         </table>
+        </div>
       </div>
           </div>
 
@@ -514,10 +586,12 @@
       </div>
       <div class="panel">
         <div class="panel-head"><div><h3>Sent history</h3></div></div>
+        <div class="table-wrap">
         <table>
           <thead><tr><th>Title</th><th>Message</th><th>Audience</th><th>Sent</th></tr></thead>
           <tbody id="notifTbody"></tbody>
         </table>
+        </div>
       </div>
     </div>
 
@@ -534,10 +608,12 @@
       </div>
       <div class="panel">
         <div class="panel-head"><div><h3>Referral leaderboard</h3><div class="panel-head-sub">Sorted by friends referred.</div></div></div>
+        <div class="table-wrap">
         <table>
           <thead><tr><th>User</th><th>Referral code</th><th>Friends referred</th><th>Earned</th></tr></thead>
           <tbody id="refTbody"></tbody>
         </table>
+        </div>
       </div>
     </div>
 
@@ -823,6 +899,16 @@
   function switchPage(page){
     document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+    closeSidebar();
+  }
+
+  function openSidebar(){
+    document.querySelector('.sidebar').classList.add('open');
+    document.getElementById('sidebarOverlay').classList.add('open');
+  }
+  function closeSidebar(){
+    document.querySelector('.sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('open');
   }
 
   // ============================================================
