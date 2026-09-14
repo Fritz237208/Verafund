@@ -202,7 +202,7 @@
   <div class="auth-shell">
 
     <div class="hero-banner">
-      <a href="sign-in" class="back-link" data-i18n="back_link">← Back</a>
+      <a href="sign-in" class="back-link" id="backLink" data-i18n="back_link" onclick="return handleBackClick(event)">← Back</a>
       <div class="lang-dropdown" id="langDropdown">
         <button class="lang-current" onclick="toggleLangMenu(event)" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -445,6 +445,19 @@
     document.getElementById('signupBlock').classList.toggle('show', !isLogin);
     hideStatus();
     refreshModeText();
+  }
+
+  // If the user is on the signup form, "Back" should return them to the
+  // login form rather than navigating away from the page.
+  function handleBackClick(e){
+    const isSignup = document.getElementById('signupBlock').classList.contains('show');
+    if (isSignup){
+      e.preventDefault();
+      setMode('login');
+      return false;
+    }
+    // On the login form, let the link behave normally (navigates to href).
+    return true;
   }
 
   // ---------- Referral code from URL (?ref=CODE) ----------
